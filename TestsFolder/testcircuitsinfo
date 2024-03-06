@@ -1,0 +1,8 @@
+We designed the 5 circuits as requested. We also made the following assumptions about the propogation delay of each of the 6 gates AND, OR, NAND, NOR, NOT, and XOR as follows:
+  1) delay NOT = 400 ps
+  2) delay NAND = 800 ps
+  3) delay NOR = 800 ps
+  4) delay AND = 1200 ps
+  5) delay OR = 1200 ps
+
+We also constructed the timing diagram of our circuit with all inputs = 0 before t = 0 (before we simulate), and then we changed either 1 or 2 of the inputs and visualized the delay on paper, and with a calculated number at the end.
