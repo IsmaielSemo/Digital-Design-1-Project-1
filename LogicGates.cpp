@@ -32,7 +32,7 @@ public:
 
 void ReadLibrary(vector<LogicGates*>& gates) //function that reads the Lib file
 {
-	ifstream inputFile("Libary.lib"); //reading the file
+	ifstream inputFile("Library.lib"); //reading the file
 
 	if (inputFile.is_open()) //if successfully opened
 	{
