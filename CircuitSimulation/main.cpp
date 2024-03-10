@@ -7,6 +7,7 @@
 #include <vector>
 #include <fstream>
 #include <QMessageBox>
+#include <stack>
 using namespace std;
 
 class LogicGates //Logic Gates class based on the provided description in the project file
@@ -35,6 +36,34 @@ public:
 
 };
 
+string fileOptimizer(string text){
+    cout << text << endl;
+    string updated;
+    stack<char> s1;
+    stack <char> s2;
+    int n = 0;
+    char c;
+    while(n != text.length()){
+        c = text[n];
+        s1.push(c);
+        n++;
+    }
+    while(!s1.empty()){
+        if(s1.top() != ' '){
+            s2.push(s1.top());
+        }
+        s1.pop();
+    }
+
+    while(!s2.empty()){
+       updated += s2.top();
+        s2.pop();
+    }
+    cout << "Updated: " <<updated << endl;
+
+    return updated;
+}
+
 void ReadLibrary(vector<LogicGates*>& gates, QString path) //function that reads the Lib file
 {
     ifstream inputFile(path.toStdString()); //reading the file
@@ -49,6 +78,7 @@ void ReadLibrary(vector<LogicGates*>& gates, QString path) //function that reads
             getline(inputFile, line, ','); //read the next part of the line
             gate->inputs = stoi(line); //number of inputs is inserted
             getline(inputFile, line, ','); //read the next part of the line
+            line = fileOptimizer(line);
             gate->functionality = line; //the functionality is inserted
             getline(inputFile, line, '\n'); //read the next part
             gate->delayps = stoi(line); //add the delay component
@@ -153,7 +183,7 @@ void FileErrorHandling(QString path)
 {
     if(path.isEmpty())
     {
-        QMessageBox::critical(nullptr, "Bad Shalan", "Basically an Empty File");
+        QMessageBox::critical(nullptr, "error", "Empty File");
         exit(0);
     }
 }
