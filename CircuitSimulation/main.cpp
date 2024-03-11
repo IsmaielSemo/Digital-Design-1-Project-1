@@ -121,6 +121,7 @@ void ReadCircuit(vector<LogicGates*>& gates ,vector<Components*>& components, ve
                 Components* component = new Components();
                 component->component_name = line; //adding components name
                 getline(inputFile, line, ',');
+                line = fileOptimizer(line);
                 for (int i = 0; i < gates.size(); i++) //opening the vector gates
                 {
                     if (gates[i]->component_name == line) //if the component name matches what's in the file
@@ -129,10 +130,21 @@ void ReadCircuit(vector<LogicGates*>& gates ,vector<Components*>& components, ve
                     }
                 }
                 getline(inputFile, line, ','); //move to the next part
+                line = fileOptimizer(line);
                 component->output.name = line; //add the output names to component
-                getline(inputFile, line, ','); //move to the next part
                 for (int i = 0; i < component->gate.inputs; i++) //checking if inputs is repeated or no
                 {
+                    if(i != component->gate.inputs - 1)
+                    {
+                        getline(inputFile, line, ','); //move to the next part
+                        line = fileOptimizer(line);
+                    }
+                    else
+                    {
+                        getline(inputFile, line, '\n');
+                        line = fileOptimizer(line);
+                    }
+
                     found = false; //assuming no repetitions
                     for (int j = 0; j < inputs.size(); j++) // looping over the number of inputs
                     {
@@ -145,29 +157,21 @@ void ReadCircuit(vector<LogicGates*>& gates ,vector<Components*>& components, ve
 
                     }
 
-                    if (found == true) //if the input exists
-                    {
-                        if (i != component->gate.inputs - 1)
-                        {
-                            getline(inputFile, line, ','); //skip this and move to the next part of line
-                        }
 
-                    }
-                    else
+                    if (found == false)
                     {
                         BoolVar* input = new BoolVar(); //create a new input
+                        line = fileOptimizer(line) ;
                         input->name = line; //puts its name
                         input->value = false; //puts its value
                         component->inputs.push_back(input); //push back
-                        if (i != component->gate.inputs - 1)
-                        {
-                            getline(inputFile, line, ','); //go to next part
-                        }
+
                     }
 
 
                 }
                 components.push_back(component); //push back the component
+
             }
         }
     }
@@ -192,8 +196,10 @@ void FileErrorHandling(QString path)
 int main(int argc, char *argv[])
 {
     QApplication a(argc, argv);
+    QMessageBox::information(nullptr, "Information", "Choose a .lib file");
     QString filePath = QFileDialog::getOpenFileName(nullptr, "Select a File", "", "Text Files (*.txt);;All Files (*)");
     FileErrorHandling(filePath);
+    QMessageBox::information(nullptr, "Information", "Choose a .cir file");
     QString filePath2 = QFileDialog::getOpenFileName(nullptr, "Select a File", "", "Text Files (*.txt);;All Files (*)");
     FileErrorHandling(filePath2);
     vector<LogicGates*> gates; //create instance of LogicGates
@@ -218,7 +224,7 @@ int main(int argc, char *argv[])
         cout << endl;
     }
 
-    for (int i = 0; i < components.size()-1; i++)
+    for (int i = 0; i < components.size(); i++)
     {
         cout << components[i]->component_name << endl;
         cout << components[i]->gate.component_name << endl;
