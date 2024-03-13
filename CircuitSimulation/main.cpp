@@ -89,6 +89,7 @@ void ReadLibrary(vector<LogicGates*>& gates, QString path) //function that reads
     else //if file wasn't opened
     {
         cout << "Unable to open file";
+        exit(0);
     }
 }
 
@@ -132,6 +133,7 @@ void ReadCircuit(vector<LogicGates*>& gates ,vector<Components*>& components, ve
                 getline(inputFile, line, ','); //move to the next part
                 line = fileOptimizer(line);
                 component->output.name = line; //add the output names to component
+                component->output.value = false;
                 for (int i = 0; i < component->gate.inputs; i++) //checking if inputs is repeated or no
                 {
                     if(i != component->gate.inputs - 1)
@@ -178,6 +180,7 @@ void ReadCircuit(vector<LogicGates*>& gates ,vector<Components*>& components, ve
     else
     {
         cout << "Unable to open file";
+        exit(0);
     }
 
 }
