@@ -36,6 +36,17 @@ public:
 
 };
 
+class stimulus
+{
+public:
+    int time_stamp_ps;
+
+    BoolVar* input;
+    bool new_value;
+
+};
+
+
 string fileOptimizer(string text){
     cout << text << endl;
     string updated;
@@ -185,6 +196,39 @@ void ReadCircuit(vector<LogicGates*>& gates ,vector<Components*>& components, ve
 
 }
 
+void ReadStimulus(vector <stimulus*> &stimuli, vector<BoolVar*>& Inputs, QString path)
+{
+    ifstream inputFile(path.toStdString()); //reading the file
+
+    if (inputFile.is_open()) //if successfully opened
+    {
+        string line;
+        while (getline(inputFile, line, ',')) //while there are still lines
+        {
+            stimulus* stimuluss = new stimulus(); //declare a gate
+            stimuluss->time_stamp_ps=stoi(line); //gate component is inserted
+            getline(inputFile, line, ','); //read the next part of the line
+            line=fileOptimizer(line); //number of inputs is inserted
+            for(int i = 0; i < Inputs.size(); i++)
+            {
+                if(line == Inputs[i]->name)
+                {
+                    stimuluss->input = Inputs[i];
+                }
+            }
+            getline(inputFile,line,'\n');
+            stimuluss->new_value=stoi(line); //the functionality is inserted
+            stimuli.push_back(stimuluss);
+        }
+        inputFile.close(); //close the file
+    }
+    else //if file wasn't opened
+    {
+        cout << "Unable to open file";
+        exit(0);
+    }
+}
+
 
 void FileErrorHandling(QString path)
 {
@@ -200,16 +244,21 @@ int main(int argc, char *argv[])
 {
     QApplication a(argc, argv);
     QMessageBox::information(nullptr, "Information", "Choose a .lib file");
-    QString filePath = QFileDialog::getOpenFileName(nullptr, "Select a File", "", "Text Files (*.txt);;All Files (*)");
+    QString filePath = QFileDialog::getOpenFileName(nullptr, "Select a File", "", "Lib Files (*.lib);;All Files (*)");
     FileErrorHandling(filePath);
     QMessageBox::information(nullptr, "Information", "Choose a .cir file");
-    QString filePath2 = QFileDialog::getOpenFileName(nullptr, "Select a File", "", "Text Files (*.txt);;All Files (*)");
+    QString filePath2 = QFileDialog::getOpenFileName(nullptr, "Select a File", "", "Circuit Files (*.cir);;All Files (*)");
     FileErrorHandling(filePath2);
+    QMessageBox::information(nullptr, "Information", "Choose a .stim file");
+    QString filePath3= QFileDialog::getOpenFileName(nullptr, "Select a File", "", "Stim Files (*.stim);;All Files (*)");
+    FileErrorHandling(filePath3);
     vector<LogicGates*> gates; //create instance of LogicGates
     vector<BoolVar*> inputs; //create instance of BoolVar
     vector<Components*> components; //create instance of Components
+    vector<stimulus*> stimuli;
     ReadLibrary(gates, filePath); //read the library file and write into the gates vector
     ReadCircuit(gates, components, inputs, filePath2); //read the circuit file and write into components and inputs vectors
+    ReadStimulus(stimuli,inputs,filePath3);
     //everything else is a test case to display the outputs
     for (int i = 0; i < gates.size(); i++)
     {
@@ -238,6 +287,13 @@ int main(int argc, char *argv[])
         cout << components[i]->output.value << endl;
         cout << components[i]->output.name << endl;
         cout << endl;
+    }
+
+    for (int i = 0; i < stimuli.size(); i++)
+    {
+        cout << stimuli[i]->time_stamp_ps << endl;
+        cout << stimuli[i]->input->name << endl;
+        cout << stimuli[i]->new_value << endl;
     }
 
     return a.exec();
