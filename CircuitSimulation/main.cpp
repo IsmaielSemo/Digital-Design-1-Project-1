@@ -98,26 +98,26 @@ string fileOptimizer(string text){
     return updated;
 }
 
-BoolVar* character_to_operator(BoolVar* A, BoolVar* B, char C, Components* component)
+void character_to_operator(BoolVar* A, BoolVar* B, char C, Components* component)
 {
 
     switch(C)
     {
     case '&':
         component->output->value = A->value & B->value;
-        return component->output;
+
         break;
     case '|':
         component->output->value = A->value | B->value;
-        return component->output;
+
         break;
     case '~':
         component->output->value = A->value ^ true;
-        return component->output;
+
         break;
     case '^':
         component->output->value = A->value ^ B->value;
-        return component->output;
+
         break;
     }
 }
@@ -204,7 +204,15 @@ void postfix_to_bool(Components* component, string postfix)
             holderstack.pop();
             holder1 = holderstack.top();
             holderstack.pop();
-            holderstack.push(character_to_operator(holder2, holder1, postfix[i], component));
+            character_to_operator(holder2, holder1, postfix[i], component);
+            holderstack.push(component->output);
+        }
+        else if(postfix[i] == '~')
+        {
+            holder2 = holderstack.top();
+            holderstack.pop();
+            character_to_operator(holder2,holder2,postfix[i], component);
+            holderstack.push(component->output);
         }
     }
 }
@@ -381,7 +389,7 @@ void Simulation(vector <stimulus*>& stimuli, vector <Components*>& Components, v
     int time = 0;
     for(int i = 0; i<stimuli.size(); i++)
     {
-        time += stimuli[i]->time_stamp_ps;
+        //time += stimuli[i]->time_stamp_ps;
         for(int j = 0; j<Inputs.size(); j++)
         {
             if(stimuli[i]->input->name == Inputs[j]->name)
@@ -393,16 +401,24 @@ void Simulation(vector <stimulus*>& stimuli, vector <Components*>& Components, v
         for (int j = 0; j < Components.size(); j++)
         {
             postfix_to_bool(Components[i], Postfix(Components[i]));
+            for(int i = 0; i<Inputs.size(); i++)
+            {
+                cout << Inputs[i]->name <<endl;
+                cout << Inputs[i]->value << endl << endl;
+
+            }
+
         }
 
     }
 
-    for(int i = 0; i<Inputs.size(); i++)
-    {
-        cout << Inputs[i]->name <<endl;
-        cout << Inputs[i]->value << endl << endl;
 
-    }
+
+//    for(int i = 0; i<Components.size(); i++)
+//    {
+//        cout << Components[i]->output->name << endl;
+//        cout << Components[i]->output->value << endl << endl;
+//    }
 }
 
 
@@ -427,6 +443,12 @@ int main(int argc, char *argv[])
     ReadCircuit(gates, components, inputs, filePath2); //read the circuit file and write into components and inputs vectors
     ReadStimulus(stimuli,inputs,filePath3);
     Simulation(stimuli,components,inputs);
+//    for (int i = 0; i < stimuli.size(); i++)
+//           {
+//               cout << stimuli[i]->time_stamp_ps << endl;
+//               cout << stimuli[i]->input->name << endl;
+//               cout << stimuli[i]->new_value << endl;
+//           }
     //everything else is a test case to display the outputs
 //    for (int i = 0; i < gates.size(); i++)
 //    {
@@ -457,12 +479,6 @@ int main(int argc, char *argv[])
 //        cout << endl;
 //    }
 
-//    for (int i = 0; i < stimuli.size(); i++)
-//    {
-//        cout << stimuli[i]->time_stamp_ps << endl;
-//        cout << stimuli[i]->input->name << endl;
-//        cout << stimuli[i]->new_value << endl;
-//    }
 
 
 
