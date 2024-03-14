@@ -32,7 +32,7 @@ public:
     string component_name; //the name of the component
     LogicGates gate; //the gate used to implement this particular operation
     vector<BoolVar*> inputs; //a vector of inputs (so we can change the size if another input is added/removed)
-    BoolVar output; //the output variable
+    BoolVar* output; //the output variable
 
 };
 
@@ -72,7 +72,7 @@ int Precedence(char A)
 }
 
 string fileOptimizer(string text){
-    cout << text << endl;
+
     string updated;
     stack<char> s1;
     stack <char> s2;
@@ -94,9 +94,32 @@ string fileOptimizer(string text){
        updated += s2.top();
         s2.pop();
     }
-    cout << "Updated: " <<updated << endl;
 
     return updated;
+}
+
+BoolVar* character_to_operator(BoolVar* A, BoolVar* B, char C, Components* component)
+{
+
+    switch(C)
+    {
+    case '&':
+        component->output->value = A->value & B->value;
+        return component->output;
+        break;
+    case '|':
+        component->output->value = A->value | B->value;
+        return component->output;
+        break;
+    case '~':
+        component->output->value = A->value ^ true;
+        return component->output;
+        break;
+    case '^':
+        component->output->value = A->value ^ B->value;
+        return component->output;
+        break;
+    }
 }
 
 string Postfix(Components* component)
@@ -151,9 +174,39 @@ string Postfix(Components* component)
 
 }
 
-bool postfix_to_bool(Components* component, string postfix)
+void postfix_to_bool(Components* component, string postfix)
 {
+    BoolVar* holder1;
+    BoolVar* holder2;
+    stack<BoolVar*> holderstack;
+    char NextChar;
+    int index;
 
+    for(int i = 0; i<postfix.size(); i++)
+    {
+        if(postfix[i] == 'i')
+        {
+            NextChar = postfix[++i];
+            if(NextChar >= '0' && NextChar <= '9')
+            {
+                index = NextChar - '0';
+                holderstack.push(component->inputs[index-1]);
+            }
+            else
+            {
+                throw QMessageBox::critical(nullptr, "error", "Invalid Naming scheme in the .Lib file");
+                exit(0);
+            }
+        }
+        else if(postfix[i] == '&' || postfix[i] == '|' || postfix[i] == '^')
+        {
+            holder2 = holderstack.top();
+            holderstack.pop();
+            holder1 = holderstack.top();
+            holderstack.pop();
+            holderstack.push(character_to_operator(holder2, holder1, postfix[i], component));
+        }
+    }
 }
 
 void ReadLibrary(vector<LogicGates*>& gates, QString path) //function that reads the Lib file
@@ -224,8 +277,10 @@ void ReadCircuit(vector<LogicGates*>& gates ,vector<Components*>& components, ve
                 }
                 getline(inputFile, line, ','); //move to the next part
                 line = fileOptimizer(line);
-                component->output.name = line; //add the output names to component
-                component->output.value = false;
+                component->output = new BoolVar();
+                component->output->name = line; //add the output names to component
+                component->output->value = false;
+                inputs.push_back(component->output);
                 for (int i = 0; i < component->gate.inputs; i++) //checking if inputs is repeated or no
                 {
                     if(i != component->gate.inputs - 1)
@@ -337,9 +392,16 @@ void Simulation(vector <stimulus*>& stimuli, vector <Components*>& Components, v
         
         for (int j = 0; j < Components.size(); j++)
         {
-
+            postfix_to_bool(Components[i], Postfix(Components[i]));
         }
-  
+
+    }
+
+    for(int i = 0; i<Inputs.size(); i++)
+    {
+        cout << Inputs[i]->name <<endl;
+        cout << Inputs[i]->value << endl << endl;
+
     }
 }
 
@@ -364,43 +426,43 @@ int main(int argc, char *argv[])
     ReadLibrary(gates, filePath); //read the library file and write into the gates vector
     ReadCircuit(gates, components, inputs, filePath2); //read the circuit file and write into components and inputs vectors
     ReadStimulus(stimuli,inputs,filePath3);
+    Simulation(stimuli,components,inputs);
     //everything else is a test case to display the outputs
-    for (int i = 0; i < gates.size(); i++)
-    {
-        cout << gates[i]->component_name << endl;
-        cout << gates[i]->inputs << endl;
-        cout << gates[i]->functionality << endl;
-        cout << gates[i]->delayps << endl;
-        cout << endl;
-    }
+//    for (int i = 0; i < gates.size(); i++)
+//    {
+//        cout << gates[i]->component_name << endl;
+//        cout << gates[i]->inputs << endl;
+//        cout << gates[i]->functionality << endl;
+//        cout << gates[i]->delayps << endl;
+//        cout << endl;
+//    }
 
-    for (int i = 0; i < inputs.size(); i++)
-    {
-        cout << inputs[i]->name << endl;
-        cout << inputs[i]->value << endl;
-        cout << endl;
-    }
+//    for (int i = 0; i < inputs.size(); i++)
+//    {
+//        cout << inputs[i]->name << endl;
+//        cout << inputs[i]->value << endl;
+//        cout << endl;
+//    }
 
-    for (int i = 0; i < components.size(); i++)
-    {
-        cout << components[i]->component_name << endl;
-        cout << components[i]->gate.component_name << endl;
-        cout << components[i]->gate.inputs << endl;
-        cout << components[i]->gate.functionality << endl;
-        cout << components[i]->gate.delayps << endl;
-        cout << components[i]->inputs[0]->name << endl;
-        cout << components[i]->output.value << endl;
-        cout << components[i]->output.name << endl;
-        cout << Postfix(components[i]) << endl;
-        cout << endl;
-    }
+//    for (int i = 0; i < components.size(); i++)
+//    {
+//        cout << components[i]->component_name << endl;
+//        cout << components[i]->gate.component_name << endl;
+//        cout << components[i]->gate.inputs << endl;
+//        cout << components[i]->gate.functionality << endl;
+//        cout << components[i]->gate.delayps << endl;
+//        cout << components[i]->inputs[0]->name << endl;
+//        cout << components[i]->output->value << endl;
+//        cout << components[i]->output->name << endl;
+//        cout << endl;
+//    }
 
-    for (int i = 0; i < stimuli.size(); i++)
-    {
-        cout << stimuli[i]->time_stamp_ps << endl;
-        cout << stimuli[i]->input->name << endl;
-        cout << stimuli[i]->new_value << endl;
-    }
+//    for (int i = 0; i < stimuli.size(); i++)
+//    {
+//        cout << stimuli[i]->time_stamp_ps << endl;
+//        cout << stimuli[i]->input->name << endl;
+//        cout << stimuli[i]->new_value << endl;
+//    }
 
 
 
