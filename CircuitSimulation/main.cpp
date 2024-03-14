@@ -46,6 +46,30 @@ public:
 
 };
 
+int Precedence(char A)
+{
+    if(A == '~')
+    {
+        return 5;
+    }
+    else if (A == '&')
+    {
+        return 4;
+    }
+    else if (A == '^')
+    {
+        return 3;
+    }
+    else if (A == '|')
+    {
+        return 2;
+    }
+    else if(A == '(')
+    {
+        return 1;
+    }
+
+}
 
 string fileOptimizer(string text){
     cout << text << endl;
@@ -73,6 +97,63 @@ string fileOptimizer(string text){
     cout << "Updated: " <<updated << endl;
 
     return updated;
+}
+
+string Postfix(Components* component)
+{
+    string postfix;
+    stack<char> holder;
+    for(int i = 0; i<component->gate.functionality.size(); i++)
+    {
+        if((component->gate.functionality[i] != '&') &&(component->gate.functionality[i] != '|') && (component->gate.functionality[i] != '~')&& (component->gate.functionality[i] != '^')&& (component->gate.functionality[i] != '(')&& (component->gate.functionality[i] != ')'))
+        {
+            postfix.push_back(component->gate.functionality[i]);
+        }
+        else if((component->gate.functionality[i] == '&')||(component->gate.functionality[i] == '|')||(component->gate.functionality[i] == '~')||(component->gate.functionality[i] == '^'))
+        {
+            while (!holder.empty() && ((Precedence(holder.top()) >= Precedence(component->gate.functionality[i]))))
+            {
+                postfix.push_back(holder.top());
+                holder.pop();
+            }
+            holder.push(component->gate.functionality[i]);
+        }
+        else if (component->gate.functionality[i] == '(')
+        {
+            holder.push(component->gate.functionality[i]);
+        }
+        else if (component->gate.functionality[i] == ')')
+        {
+            while(holder.top() != '(' && !holder.empty())
+            {
+                postfix.push_back(holder.top());
+                holder.pop();
+            }
+
+            holder.pop();
+        }
+    }
+
+    while(!holder.empty())
+    {
+        if(holder.top() == '(')
+        {
+            holder.pop();
+        }
+        else
+        {
+            postfix.push_back(holder.top());
+            holder.pop();
+        }
+    }
+
+    return postfix;
+
+}
+
+bool postfix_to_bool(Components* component, string postfix)
+{
+
 }
 
 void ReadLibrary(vector<LogicGates*>& gates, QString path) //function that reads the Lib file
@@ -239,6 +320,30 @@ void FileErrorHandling(QString path)
     }
 }
 
+void Simulation(vector <stimulus*>& stimuli, vector <Components*>& Components, vector <BoolVar*>& Inputs)
+{
+    string postfix;
+    int time = 0;
+    for(int i = 0; i<stimuli.size(); i++)
+    {
+        time += stimuli[i]->time_stamp_ps;
+        for(int j = 0; j<Inputs.size(); j++)
+        {
+            if(stimuli[i]->input->name == Inputs[j]->name)
+            {
+                Inputs[j]->value = stimuli[i]->new_value;
+            }
+        }
+        
+        for (int j = 0; j < Components.size(); j++)
+        {
+
+        }
+  
+    }
+}
+
+
 
 int main(int argc, char *argv[])
 {
@@ -286,6 +391,7 @@ int main(int argc, char *argv[])
         cout << components[i]->inputs[0]->name << endl;
         cout << components[i]->output.value << endl;
         cout << components[i]->output.name << endl;
+        cout << Postfix(components[i]) << endl;
         cout << endl;
     }
 
@@ -295,6 +401,8 @@ int main(int argc, char *argv[])
         cout << stimuli[i]->input->name << endl;
         cout << stimuli[i]->new_value << endl;
     }
+
+
 
     return a.exec();
 }
