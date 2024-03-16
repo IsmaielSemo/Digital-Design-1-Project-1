@@ -98,28 +98,32 @@ string fileOptimizer(string text){
     return updated;
 }
 
-void character_to_operator(BoolVar* A, BoolVar* B, char C, Components* component)
+BoolVar* character_to_operator(BoolVar* A, BoolVar* B, char C, Components* component)
 {
+    BoolVar* Out = new BoolVar();
+    Out->name = "PlaceHolder :D";
 
     switch(C)
     {
     case '&':
-        component->output->value = A->value & B->value;
+        Out->value = A->value & B->value;
 
         break;
     case '|':
-        component->output->value = A->value | B->value;
+        Out->value = A->value | B->value;
 
         break;
     case '~':
-        component->output->value = A->value ^ true;
+        Out->value = A->value ^ true;
 
         break;
     case '^':
-        component->output->value = A->value ^ B->value;
+        Out->value = A->value ^ B->value;
 
         break;
     }
+
+    return Out;
 }
 
 string Postfix(Components* component)
@@ -204,17 +208,18 @@ void postfix_to_bool(Components* component, string postfix)
             holderstack.pop();
             holder1 = holderstack.top();
             holderstack.pop();
-            character_to_operator(holder2, holder1, postfix[i], component);
-            holderstack.push(component->output);
+            holderstack.push(character_to_operator(holder2, holder1, postfix[i], component));
         }
         else if(postfix[i] == '~')
         {
             holder2 = holderstack.top();
             holderstack.pop();
-            character_to_operator(holder2,holder2,postfix[i], component);
-            holderstack.push(component->output);
+            holderstack.push(character_to_operator(holder2,holder2,postfix[i], component));
         }
     }
+
+    component->output ->value = holderstack.top()->value;
+    holderstack.pop();
 }
 
 void ReadLibrary(vector<LogicGates*>& gates, QString path) //function that reads the Lib file
@@ -400,25 +405,20 @@ void Simulation(vector <stimulus*>& stimuli, vector <Components*>& Components, v
         
         for (int j = 0; j < Components.size(); j++)
         {
-            postfix_to_bool(Components[i], Postfix(Components[i]));
-            for(int i = 0; i<Inputs.size(); i++)
-            {
-                cout << Inputs[i]->name <<endl;
-                cout << Inputs[i]->value << endl << endl;
-
-            }
+            postfix_to_bool(Components[j], Postfix(Components[j]));
 
         }
+
 
     }
 
 
 
-//    for(int i = 0; i<Components.size(); i++)
-//    {
-//        cout << Components[i]->output->name << endl;
-//        cout << Components[i]->output->value << endl << endl;
-//    }
+   for(int i = 0; i<Components.size(); i++)
+   {
+       cout << Components[i]->output->name << endl;
+       cout << Components[i]->output->value << endl << endl;
+   }
 }
 
 
