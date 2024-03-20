@@ -24,6 +24,7 @@ class BoolVar //class used to describe the BoolVar (used for both inputs and out
 public:
     string name;
     bool value;
+    int currtime = 0;
 };
 
 class Components //class used to describe circuit components
@@ -178,13 +179,15 @@ string Postfix(Components* component)
 
 }
 
-void postfix_to_bool(Components* component, string postfix)
+void postfix_to_bool(Components* component, string postfix, int& time, ofstream& outputFile)
 {
     BoolVar* holder1;
     BoolVar* holder2;
     stack<BoolVar*> holderstack;
     char NextChar;
     int index;
+    int timecontroller;
+    bool oldvalue;
 
     for(int i = 0; i<postfix.size(); i++)
     {
@@ -209,16 +212,26 @@ void postfix_to_bool(Components* component, string postfix)
             holder1 = holderstack.top();
             holderstack.pop();
             holderstack.push(character_to_operator(holder2, holder1, postfix[i], component));
+            time = max(holder1->currtime, holder2->currtime);
+
         }
         else if(postfix[i] == '~')
         {
             holder2 = holderstack.top();
             holderstack.pop();
             holderstack.push(character_to_operator(holder2,holder2,postfix[i], component));
+
+
+
         }
     }
-
+    oldvalue = component->output->value;
     component->output ->value = holderstack.top()->value;
+    component->output->currtime = time + component->gate.delayps;
+    if(component->output->value != oldvalue)
+    {
+        outputFile << component->output->currtime << ", " << component->output->name << ", " << component->output->value << endl;
+    }
     holderstack.pop();
 }
 
@@ -388,24 +401,67 @@ void FileErrorHandling(QString path)
     }
 }
 
-void Simulation(vector <stimulus*>& stimuli, vector <Components*>& Components, vector <BoolVar*>& Inputs)
+void InputChecker(vector <stimulus*>& stimuli, vector <BoolVar*>& Inputs, int i, ofstream& outputFile, int& time)
 {
+    for(int j = 0; j<Inputs.size(); j++)
+    {
+
+        if(stimuli[i]->input->name == Inputs[j]->name)
+        {
+            Inputs[j]->value = stimuli[i]->new_value;
+            Inputs[j]->currtime = stimuli[i]->time_stamp_ps;
+            outputFile << time << ", " << Inputs[j]->name << ", " << Inputs[j]->value << endl;
+        }
+
+    }
+}
+
+void Simulation(vector <stimulus*>& stimuli, vector <Components*>& Components, vector <BoolVar*>& Inputs, QString filePath4)
+{
+    ofstream outputFile(filePath4.toStdString());
     string postfix;
     int time = 0;
+    int c = 0;
+    if(!outputFile.is_open())
+    {
+        QMessageBox::critical(nullptr, "error", "Unable To Open The File");
+        exit(0);
+    }
+
+    outputFile.clear();
+    for (int j = 0; j < Components.size(); j++)
+    {
+        postfix_to_bool(Components[j], Postfix(Components[j]), time, outputFile);
+
+    }
+
     for(int i = 0; i<stimuli.size(); i++)
     {
-        //time += stimuli[i]->time_stamp_ps;
-        for(int j = 0; j<Inputs.size(); j++)
+        c = i+1;
+
+        time = stimuli[i]->time_stamp_ps;
+
+        InputChecker(stimuli,Inputs,i, outputFile, time);
+
+        if(c <stimuli.size())
         {
-            if(stimuli[i]->input->name == Inputs[j]->name)
+            while(time == stimuli[c]->time_stamp_ps)
             {
-                Inputs[j]->value = stimuli[i]->new_value;
+                if(c !=stimuli.size())
+                {
+                    InputChecker(stimuli,Inputs,c, outputFile,time);
+                    c++;
+                    i = c-1;
+
+                }
             }
         }
+
+
         
         for (int j = 0; j < Components.size(); j++)
         {
-            postfix_to_bool(Components[j], Postfix(Components[j]));
+            postfix_to_bool(Components[j], Postfix(Components[j]), time, outputFile);
 
         }
 
@@ -435,6 +491,9 @@ int main(int argc, char *argv[])
     QMessageBox::information(nullptr, "Information", "Choose a .stim file");
     QString filePath3= QFileDialog::getOpenFileName(nullptr, "Select a File", "", "Stim Files (*.stim);;All Files (*)");
     FileErrorHandling(filePath3);
+    QMessageBox::information(nullptr, "Information", "Choose a .sim file");
+    QString filePath4= QFileDialog::getOpenFileName(nullptr, "Select a File", "", "Sim Files (*.sim);;All Files (*)");
+    FileErrorHandling(filePath4);
     vector<LogicGates*> gates; //create instance of LogicGates
     vector<BoolVar*> inputs; //create instance of BoolVar
     vector<Components*> components; //create instance of Components
@@ -442,55 +501,5 @@ int main(int argc, char *argv[])
     ReadLibrary(gates, filePath); //read the library file and write into the gates vector
     ReadCircuit(gates, components, inputs, filePath2); //read the circuit file and write into components and inputs vectors
     ReadStimulus(stimuli,inputs,filePath3);
-    Simulation(stimuli,components,inputs);
-//    for (int i = 0; i < stimuli.size(); i++)
-//           {
-//               cout << stimuli[i]->time_stamp_ps << endl;
-//               cout << stimuli[i]->input->name << endl;
-//               cout << stimuli[i]->new_value << endl;
-//           }
-    //everything else is a test case to display the outputs
-//    for (int i = 0; i < gates.size(); i++)
-//    {
-//        cout << gates[i]->component_name << endl;
-//        cout << gates[i]->inputs << endl;
-//        cout << gates[i]->functionality << endl;
-//        cout << gates[i]->delayps << endl;
-//        cout << endl;
-//    }
-
-//    for (int i = 0; i < inputs.size(); i++)
-//    {
-//        cout << inputs[i]->name << endl;
-//        cout << inputs[i]->value << endl;
-//        cout << endl;
-//    }
-
-//    for (int i = 0; i < components.size(); i++)
-//    {
-//        cout << components[i]->component_name << endl;
-//        cout << components[i]->gate.component_name << endl;
-//        cout << components[i]->gate.inputs << endl;
-//        cout << components[i]->gate.functionality << endl;
-//        cout << components[i]->gate.delayps << endl;
-//        cout << components[i]->inputs[0]->name << endl;
-//        cout << components[i]->output->value << endl;
-//        cout << components[i]->output->name << endl;
-//        cout << endl;
-//    }
-
-
-
-
-    return a.exec();
+    Simulation(stimuli,components,inputs,filePath4);
 }
-
-
-
-//int main(int argc, char *argv[])
-//{
-//  QApplication a(argc, argv);
-//   QString filePath = QFileDialog::getOpenFileName(nullptr, "Select a File", "", "Text Files (*.txt);;All Files (*)");
-
-//  return a.exec();
-//}
