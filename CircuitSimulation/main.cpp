@@ -22,9 +22,9 @@ public:
 class BoolVar //class used to describe the BoolVar (used for both inputs and outputs)
 {
 public:
-    string name;
-    bool value;
-    int currtime = 0;
+    string name; //name of variable
+    bool value; //value of variable
+    int currtime = 0; //the time of each variable (needed in the simulation)
 };
 
 class Components //class used to describe circuit components
@@ -37,97 +37,97 @@ public:
 
 };
 
-class stimulus
+class stimulus //class for the stimulus file
 {
 public:
-    int time_stamp_ps;
+    int time_stamp_ps; //time at which event begins
 
-    BoolVar* input;
-    bool new_value;
+    BoolVar* input; //the variable that changes (instantiated using pointer of BoolVar)
+    bool new_value; //the new value to be assigned to the variable
 
 };
 
-int Precedence(char A)
+int Precedence(char A) //function that gets the precedence (step in the process of changing the functionality to a valid postfix expression)
 {
-    if(A == '~')
+    if(A == '~') //highest precedence is negation
     {
-        return 5;
+        return 5; //return the highest number
     }
-    else if (A == '&')
+    else if (A == '&') //& is second highest precedence
     {
-        return 4;
+        return 4; //return second highest number
     }
-    else if (A == '^')
+    else if (A == '^') //^ is 3rd highest precedence
     {
-        return 3;
+        return 3; //return 3rd highest number
     }
-    else if (A == '|')
+    else if (A == '|') //| is 4th highest precedence
     {
-        return 2;
+        return 2; //return 4th highest number
     }
-    else if(A == '(')
+    else if(A == '(') //( is 5th highest precedence
     {
-        return 1;
+        return 1; //return 5th highest number
     }
 
 }
 
-string fileOptimizer(string text){
+string fileOptimizer(string text){ //function that optimizes the file and generalizes it by removing spaces(takes in a string)
 
-    string updated;
-    stack<char> s1;
-    stack <char> s2;
-    int n = 0;
-    char c;
-    while(n != text.length()){
-        c = text[n];
-        s1.push(c);
-        n++;
+    string updated; //the string to be returned
+    stack<char> s1; //first stack (push string inside it)
+    stack <char> s2; //second stack (add every character that isn't a space)
+    int n = 0; //varibale for length of text
+    char c; //to push in stack
+    while(n != text.length()){ //if the text is not done
+        c = text[n]; //read the character
+        s1.push(c); //push in the first stack
+        n++; //go to next character
     }
-    while(!s1.empty()){
-        if(s1.top() != ' '){
-            s2.push(s1.top());
+    while(!s1.empty()){ //while there are still elements in the stack
+        if(s1.top() != ' '){ //if the top character is not a space
+            s2.push(s1.top()); //add it to second stack
         }
-        s1.pop();
+        s1.pop(); //go to next element in stack
+    }
+//text is now inverted in stack2. We need to bring it back
+    while(!s2.empty()){ //while there are still elements
+       updated += s2.top(); //write to string
+        s2.pop(); //go to next element in stack
     }
 
-    while(!s2.empty()){
-       updated += s2.top();
-        s2.pop();
-    }
-
-    return updated;
+    return updated; //now a string without spaces
 }
 
-BoolVar* character_to_operator(BoolVar* A, BoolVar* B, char C, Components* component)
+BoolVar* character_to_operator(BoolVar* A, BoolVar* B, char C, Components* component) //function that handles the behaviors of the different boolean functions (using bitwise operators)
 {
-    BoolVar* Out = new BoolVar();
-    Out->name = "PlaceHolder :D";
+    BoolVar* Out = new BoolVar(); //the out to be returned
+    Out->name = "PlaceHolder :D"; //just a name given to it (not that important but needed to be done to avoid errors in the instantiation)
 
     switch(C)
     {
-    case '&':
-        Out->value = A->value & B->value;
+    case '&': //if AND
+        Out->value = A->value & B->value; //perform AND operation
 
         break;
-    case '|':
-        Out->value = A->value | B->value;
+    case '|': //if OR
+        Out->value = A->value | B->value; //perform OR operation
 
         break;
-    case '~':
-        Out->value = A->value ^ true;
+    case '~': //if NOT
+        Out->value = A->value ^ true; // perform NOT operation
 
         break;
-    case '^':
-        Out->value = A->value ^ B->value;
+    case '^': //if XOR
+        Out->value = A->value ^ B->value; //perform XOR operation
 
         break;
     }
 
-    return Out;
+    return Out; //return the output
 }
 
-string Postfix(Components* component)
+string Postfix(Components* component) //function that turns the components to an expression in Postfix
 {
     string postfix;
     stack<char> holder;
@@ -392,11 +392,11 @@ void ReadStimulus(vector <stimulus*> &stimuli, vector<BoolVar*>& Inputs, QString
 }
 
 
-void FileErrorHandling(QString path)
+void FileErrorHandling(QString path) //function that handles error
 {
     if(path.isEmpty())
     {
-        QMessageBox::critical(nullptr, "error", "Empty File");
+        QMessageBox::critical(nullptr, "error", "Empty File"); //if user did not select a file at the beginning
         exit(0);
     }
 }
@@ -416,7 +416,7 @@ void InputChecker(vector <stimulus*>& stimuli, vector <BoolVar*>& Inputs, int i,
     }
 }
 
-void Simulation(vector <stimulus*>& stimuli, vector <Components*>& Components, vector <BoolVar*>& Inputs, QString filePath4)
+void Simulation(vector <stimulus*>& stimuli, vector <Components*>& Components, vector <BoolVar*>& Inputs, QString filePath4) //simulation function
 {
     ofstream outputFile(filePath4.toStdString());
     string postfix;
