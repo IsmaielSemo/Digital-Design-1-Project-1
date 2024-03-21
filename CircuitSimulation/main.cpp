@@ -129,75 +129,74 @@ BoolVar* character_to_operator(BoolVar* A, BoolVar* B, char C, Components* compo
 
 string Postfix(Components* component) //function that turns the components to an expression in Postfix
 {
-    string postfix;
-    stack<char> holder;
-    for(int i = 0; i<component->gate.functionality.size(); i++)
+    string postfix; //the string that will be returned (in postfix)
+    stack<char> holder; //stack used for the bitwise operators and the parentheses
+    for(int i = 0; i<component->gate.functionality.size(); i++) //exploring the entirety of the functionality of component
     {
-        if((component->gate.functionality[i] != '&') &&(component->gate.functionality[i] != '|') && (component->gate.functionality[i] != '~')&& (component->gate.functionality[i] != '^')&& (component->gate.functionality[i] != '(')&& (component->gate.functionality[i] != ')'))
+        if((component->gate.functionality[i] != '&') &&(component->gate.functionality[i] != '|') && (component->gate.functionality[i] != '~')&& (component->gate.functionality[i] != '^')&& (component->gate.functionality[i] != '(')&& (component->gate.functionality[i] != ')')) //if character is not a bitwise operator or a parenthesis
         {
-            postfix.push_back(component->gate.functionality[i]);
+            postfix.push_back(component->gate.functionality[i]); //add the character to the end of the postfix string
         }
-        else if((component->gate.functionality[i] == '&')||(component->gate.functionality[i] == '|')||(component->gate.functionality[i] == '~')||(component->gate.functionality[i] == '^'))
+        else if((component->gate.functionality[i] == '&')||(component->gate.functionality[i] == '|')||(component->gate.functionality[i] == '~')||(component->gate.functionality[i] == '^')) //if the character is a bitwise operator
         {
-            while (!holder.empty() && ((Precedence(holder.top()) >= Precedence(component->gate.functionality[i]))))
+            while (!holder.empty() && ((Precedence(holder.top()) >= Precedence(component->gate.functionality[i])))) //while there are elements in holder and the precedence of the top element in holder is greater than the current character
             {
-                postfix.push_back(holder.top());
-                holder.pop();
+                postfix.push_back(holder.top()); //add the top of the holder to the postfix string
+                holder.pop(); //explore next element in holder
             }
-            holder.push(component->gate.functionality[i]);
+            holder.push(component->gate.functionality[i]); //push to holder stack
         }
-        else if (component->gate.functionality[i] == '(')
+        else if (component->gate.functionality[i] == '(') //if character is open parenthesis
         {
-            holder.push(component->gate.functionality[i]);
+            holder.push(component->gate.functionality[i]); //push the character into the holder stack
         }
-        else if (component->gate.functionality[i] == ')')
+        else if (component->gate.functionality[i] == ')') //if character is closed parenthesis
         {
-            while(holder.top() != '(' && !holder.empty())
+            while(holder.top() != '(' && !holder.empty()) //while the top element is not "(" and the holder isn't empty
             {
-                postfix.push_back(holder.top());
-                holder.pop();
+                postfix.push_back(holder.top()); //push the top to the end of postfix
+                holder.pop(); //explore next top
             }
 
             holder.pop();
         }
     }
 
-    while(!holder.empty())
+    while(!holder.empty()) //while there are still characters in holder
     {
-        if(holder.top() == '(')
+        if(holder.top() == '(') //if the character at the top is "("
         {
-            holder.pop();
+            holder.pop(); //simply pop it and don't add it to the string 
         }
         else
         {
-            postfix.push_back(holder.top());
-            holder.pop();
-        }
+            postfix.push_back(holder.top()); //else push the top of the holder to the end of postfix
+            holder.pop(); //explore next element in holder
     }
 
-    return postfix;
+    return postfix; //return the components functionality now in postfix format as a string
 
 }
 
-void postfix_to_bool(Components* component, string postfix, int& time, ofstream& outputFile)
-{
-    BoolVar* holder1;
-    BoolVar* holder2;
-    stack<BoolVar*> holderstack;
-    char NextChar;
+void postfix_to_bool(Components* component, string postfix, int& time, ofstream& outputFile) //function that transforms a postfix expression to a boolean one
+{//parameters are the components pointer, the postfix string (generated from the previous function), the time (for the simulation) and the output file
+    BoolVar* holder1; //BoolVar pointer for input1
+    BoolVar* holder2; //BoolVar pointer for input2
+    stack<BoolVar*> holderstack; //stack of BoolVar pointer
+    char NextChar; 
     int index;
     int timecontroller;
     bool oldvalue;
 
-    for(int i = 0; i<postfix.size(); i++)
+    for(int i = 0; i<postfix.size(); i++) //while we are still in the postfix expression
     {
-        if(postfix[i] == 'i')
+        if(postfix[i] == 'i') //if the character is "i", meaning it isn't bitwise or parenthesis
         {
-            NextChar = postfix[++i];
-            if(NextChar >= '0' && NextChar <= '9')
+            NextChar = postfix[++i]; //get the next character
+            if(NextChar >= '0' && NextChar <= '9') //if next character is a number from 0 to 9
             {
-                index = NextChar - '0';
-                holderstack.push(component->inputs[index-1]);
+                index = NextChar - '0'; //get its index
+                holderstack.push(component->inputs[index-1]); //push it to stack
             }
             else
             {
@@ -205,32 +204,32 @@ void postfix_to_bool(Components* component, string postfix, int& time, ofstream&
                 exit(0);
             }
         }
-        else if(postfix[i] == '&' || postfix[i] == '|' || postfix[i] == '^')
+        else if(postfix[i] == '&' || postfix[i] == '|' || postfix[i] == '^') //if the character is a bitwise operator
         {
-            holder2 = holderstack.top();
-            holderstack.pop();
-            holder1 = holderstack.top();
-            holderstack.pop();
-            holderstack.push(character_to_operator(holder2, holder1, postfix[i], component));
-            time = max(holder1->currtime, holder2->currtime);
+            holder2 = holderstack.top(); //get the top element and store it in holder2
+            holderstack.pop(); //pop it
+            holder1 = holderstack.top(); //get the new top and store it in holder1
+            holderstack.pop(); //pop it
+            holderstack.push(character_to_operator(holder2, holder1, postfix[i], component)); //push in the stack the result of the operation of postfix[i] on holder1 and 2 and store it in component, making use of the character_to_operator function
+            time = max(holder1->currtime, holder2->currtime); //the time it takes is the max of both holder1 and holder2
 
         }
-        else if(postfix[i] == '~')
+        else if(postfix[i] == '~') //if the character is the negation operator
         {
-            holder2 = holderstack.top();
-            holderstack.pop();
-            holderstack.push(character_to_operator(holder2,holder2,postfix[i], component));
+            holder2 = holderstack.top(); //get the top in the stack
+            holderstack.pop(); //pop it
+            holderstack.push(character_to_operator(holder2,holder2,postfix[i], component)); //push in the stack the result of the operation of postfix[i] on holder2 in component
 
 
 
         }
     }
-    oldvalue = component->output->value;
-    component->output ->value = holderstack.top()->value;
-    component->output->currtime = time + component->gate.delayps;
-    if(component->output->value != oldvalue)
+    oldvalue = component->output->value; //old value of component
+    component->output ->value = holderstack.top()->value; //the new value of component (as reached above)
+    component->output->currtime = time + component->gate.delayps; //the time it took it reach such output (change of event in variable + gate delay time)
+    if(component->output->value != oldvalue) //if the new value is not equal to the old one
     {
-        outputFile << component->output->currtime << ", " << component->output->name << ", " << component->output->value << endl;
+        outputFile << component->output->currtime << ", " << component->output->name << ", " << component->output->value << endl; //write to file
     }
     holderstack.pop();
 }
@@ -401,16 +400,16 @@ void FileErrorHandling(QString path) //function that handles error
     }
 }
 
-void InputChecker(vector <stimulus*>& stimuli, vector <BoolVar*>& Inputs, int i, ofstream& outputFile, int& time)
+void InputChecker(vector <stimulus*>& stimuli, vector <BoolVar*>& Inputs, int i, ofstream& outputFile, int& time) //function that updates the input parameters (value and time) based on the information in the stimuli file
 {
-    for(int j = 0; j<Inputs.size(); j++)
+    for(int j = 0; j<Inputs.size(); j++) //while there are inputs to explore
     {
 
-        if(stimuli[i]->input->name == Inputs[j]->name)
+        if(stimuli[i]->input->name == Inputs[j]->name) //if the inputs match
         {
-            Inputs[j]->value = stimuli[i]->new_value;
-            Inputs[j]->currtime = stimuli[i]->time_stamp_ps;
-            outputFile << time << ", " << Inputs[j]->name << ", " << Inputs[j]->value << endl;
+            Inputs[j]->value = stimuli[i]->new_value; //change the value to that in the stimulus file
+            Inputs[j]->currtime = stimuli[i]->time_stamp_ps; //update the time likewise to when the event takes place
+            outputFile << time << ", " << Inputs[j]->name << ", " << Inputs[j]->value << endl; //write to the file
         }
 
     }
@@ -418,40 +417,40 @@ void InputChecker(vector <stimulus*>& stimuli, vector <BoolVar*>& Inputs, int i,
 
 void Simulation(vector <stimulus*>& stimuli, vector <Components*>& Components, vector <BoolVar*>& Inputs, QString filePath4) //simulation function
 {
-    ofstream outputFile(filePath4.toStdString());
-    string postfix;
-    int time = 0;
+    ofstream outputFile(filePath4.toStdString()); //the file that we will write to
+    string postfix; //string to be used for postfix
+    int time = 0; //time of simulation
     int c = 0;
-    if(!outputFile.is_open())
+    if(!outputFile.is_open()) //error handling if the file did not open
     {
         QMessageBox::critical(nullptr, "error", "Unable To Open The File");
         exit(0);
     }
 
-    outputFile.clear();
+    outputFile.clear(); 
     for (int j = 0; j < Components.size(); j++)
     {
-        postfix_to_bool(Components[j], Postfix(Components[j]), time, outputFile);
+        postfix_to_bool(Components[j], Postfix(Components[j]), time, outputFile); //will generate a boolean expression given components, a postfix expression, and the time (outputs to file)
 
     }
 
     for(int i = 0; i<stimuli.size(); i++)
     {
-        c = i+1;
+        c = i+1; //check the following input
 
-        time = stimuli[i]->time_stamp_ps;
+        time = stimuli[i]->time_stamp_ps; //get the time of the input we are at
 
-        InputChecker(stimuli,Inputs,i, outputFile, time);
+        InputChecker(stimuli,Inputs,i, outputFile, time); //apply the changes to the input through the event
 
-        if(c <stimuli.size())
+        if(c <stimuli.size()) //if the next input is still within the stimuli
         {
-            while(time == stimuli[c]->time_stamp_ps)
+            while(time == stimuli[c]->time_stamp_ps) //while the time of input we're at is the same as the one after
             {
                 if(c !=stimuli.size())
                 {
-                    InputChecker(stimuli,Inputs,c, outputFile,time);
-                    c++;
-                    i = c-1;
+                    InputChecker(stimuli,Inputs,c, outputFile,time); //apply the changes to the next input through the event
+                    c++; //go to the next character
+                    i = c-1; //change the i accordingly (accelerating the for loop)
 
                 }
             }
@@ -461,7 +460,7 @@ void Simulation(vector <stimulus*>& stimuli, vector <Components*>& Components, v
         
         for (int j = 0; j < Components.size(); j++)
         {
-            postfix_to_bool(Components[j], Postfix(Components[j]), time, outputFile);
+            postfix_to_bool(Components[j], Postfix(Components[j]), time, outputFile); //get the boolean expression of the now changed inputs
 
         }
 
@@ -470,7 +469,7 @@ void Simulation(vector <stimulus*>& stimuli, vector <Components*>& Components, v
 
 
 
-   for(int i = 0; i<Components.size(); i++)
+   for(int i = 0; i<Components.size(); i++) //displaying all the components (output name and value)
    {
        cout << Components[i]->output->name << endl;
        cout << Components[i]->output->value << endl << endl;
