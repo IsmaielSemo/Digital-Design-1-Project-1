@@ -8,6 +8,7 @@
 #include <fstream>
 #include <QMessageBox>
 #include <stack>
+#include <QtCharts/QtCharts>
 using namespace std;
 
 class LogicGates //Logic Gates class based on the provided description in the project file
@@ -46,6 +47,49 @@ public:
     bool new_value; //the new value to be assigned to the variable
 
 };
+
+void SortedAddition(BoolVar value, vector<BoolVar>& SortedOutput) {
+    if (SortedOutput.empty()) {
+        SortedOutput.push_back(value);
+        return;
+    }
+
+    // Case: value's currtime is smaller than the first element in SortedOutput
+    if (value.currtime <= SortedOutput.front().currtime) {
+        SortedOutput.insert(SortedOutput.begin(), value);
+        return;
+    }
+
+    // Case: value's currtime is larger than the last element in SortedOutput
+    if (value.currtime >= SortedOutput.back().currtime) {
+        SortedOutput.push_back(value);
+        return;
+    }
+
+    // Find the appropriate position to insert value while maintaining sorted order
+    for (int i = 0; i < SortedOutput.size(); ++i) {
+        if (value.currtime <= SortedOutput[i].currtime) {
+            SortedOutput.insert(SortedOutput.begin() + i, value);
+            return;
+        }
+    }
+}
+
+int Maximum(int A, int B)
+{
+    if (A > B)
+    {
+        return A;
+    }
+    else if (B > A)
+    {
+        return B;
+    }
+    else
+    {
+        return A;
+    }
+}
 
 int Precedence(char A) //function that gets the precedence (step in the process of changing the functionality to a valid postfix expression)
 {
@@ -172,13 +216,13 @@ string Postfix(Components* component) //function that turns the components to an
         {
             postfix.push_back(holder.top()); //else push the top of the holder to the end of postfix
             holder.pop(); //explore next element in holder
+        }
     }
 
     return postfix; //return the components functionality now in postfix format as a string
+ }
 
-}
-
-void postfix_to_bool(Components* component, string postfix, int& time, ofstream& outputFile) //function that transforms a postfix expression to a boolean one
+void postfix_to_bool(Components* component, string postfix, int& time, bool& firstsim, vector<BoolVar>& SortedOutput) //function that transforms a postfix expression to a boolean one
 {//parameters are the components pointer, the postfix string (generated from the previous function), the time (for the simulation) and the output file
     BoolVar* holder1; //BoolVar pointer for input1
     BoolVar* holder2; //BoolVar pointer for input2
@@ -211,12 +255,13 @@ void postfix_to_bool(Components* component, string postfix, int& time, ofstream&
             holder1 = holderstack.top(); //get the new top and store it in holder1
             holderstack.pop(); //pop it
             holderstack.push(character_to_operator(holder2, holder1, postfix[i], component)); //push in the stack the result of the operation of postfix[i] on holder1 and 2 and store it in component, making use of the character_to_operator function
-            time = max(holder1->currtime, holder2->currtime); //the time it takes is the max of both holder1 and holder2
+            time = Maximum(holder1->currtime, holder2->currtime); //the time it takes is the max of both holder1 and holder2
 
         }
         else if(postfix[i] == '~') //if the character is the negation operator
         {
             holder2 = holderstack.top(); //get the top in the stack
+            time = holder2->currtime;
             holderstack.pop(); //pop it
             holderstack.push(character_to_operator(holder2,holder2,postfix[i], component)); //push in the stack the result of the operation of postfix[i] on holder2 in component
 
@@ -226,10 +271,19 @@ void postfix_to_bool(Components* component, string postfix, int& time, ofstream&
     }
     oldvalue = component->output->value; //old value of component
     component->output ->value = holderstack.top()->value; //the new value of component (as reached above)
-    component->output->currtime = time + component->gate.delayps; //the time it took it reach such output (change of event in variable + gate delay time)
+    if(firstsim)
+    {
+        component->output->currtime = 0;
+
+    }
+    else
+    {
+        component->output->currtime = time + component->gate.delayps;
+    }
+     //the time it took it reach such output (change of event in variable + gate delay time)
     if(component->output->value != oldvalue) //if the new value is not equal to the old one
     {
-        outputFile << component->output->currtime << ", " << component->output->name << ", " << component->output->value << endl; //write to file
+        SortedAddition(*component->output, SortedOutput);
     }
     holderstack.pop();
 }
@@ -400,7 +454,7 @@ void FileErrorHandling(QString path) //function that handles error
     }
 }
 
-void InputChecker(vector <stimulus*>& stimuli, vector <BoolVar*>& Inputs, int i, ofstream& outputFile, int& time) //function that updates the input parameters (value and time) based on the information in the stimuli file
+void InputChecker(vector <stimulus*>& stimuli, vector <BoolVar*>& Inputs, int i, int& time, vector<BoolVar>& SortedOutput) //function that updates the input parameters (value and time) based on the information in the stimuli file
 {
     for(int j = 0; j<Inputs.size(); j++) //while there are inputs to explore
     {
@@ -409,30 +463,38 @@ void InputChecker(vector <stimulus*>& stimuli, vector <BoolVar*>& Inputs, int i,
         {
             Inputs[j]->value = stimuli[i]->new_value; //change the value to that in the stimulus file
             Inputs[j]->currtime = stimuli[i]->time_stamp_ps; //update the time likewise to when the event takes place
-            outputFile << time << ", " << Inputs[j]->name << ", " << Inputs[j]->value << endl; //write to the file
+            SortedAddition(*Inputs[j],SortedOutput);
         }
 
     }
 }
 
-void Simulation(vector <stimulus*>& stimuli, vector <Components*>& Components, vector <BoolVar*>& Inputs, QString filePath4) //simulation function
+void Simulation(vector <stimulus*>& stimuli, vector <Components*>& Components, vector <BoolVar*>& Inputs, vector<BoolVar>& SortedOutput) //simulation function
 {
-    ofstream outputFile(filePath4.toStdString()); //the file that we will write to
+
     string postfix; //string to be used for postfix
     int time = 0; //time of simulation
     int c = 0;
-    if(!outputFile.is_open()) //error handling if the file did not open
-    {
-        QMessageBox::critical(nullptr, "error", "Unable To Open The File");
-        exit(0);
-    }
+    bool FirstSim = true;
 
-    outputFile.clear(); 
+
+
     for (int j = 0; j < Components.size(); j++)
     {
-        postfix_to_bool(Components[j], Postfix(Components[j]), time, outputFile); //will generate a boolean expression given components, a postfix expression, and the time (outputs to file)
+        postfix_to_bool(Components[j], Postfix(Components[j]), time, FirstSim, SortedOutput); //will generate a boolean expression given components, a postfix expression, and the time (outputs to file)
 
     }
+
+    for (int i = 0; i <Inputs.size(); i++)
+    {
+        if(Inputs[i]->value == 0)
+        {
+            SortedAddition(*Inputs[i], SortedOutput);
+        }
+    }
+
+
+    FirstSim = false;
 
     for(int i = 0; i<stimuli.size(); i++)
     {
@@ -440,7 +502,7 @@ void Simulation(vector <stimulus*>& stimuli, vector <Components*>& Components, v
 
         time = stimuli[i]->time_stamp_ps; //get the time of the input we are at
 
-        InputChecker(stimuli,Inputs,i, outputFile, time); //apply the changes to the input through the event
+        InputChecker(stimuli,Inputs,i, time, SortedOutput); //apply the changes to the input through the event
 
         if(c <stimuli.size()) //if the next input is still within the stimuli
         {
@@ -448,7 +510,7 @@ void Simulation(vector <stimulus*>& stimuli, vector <Components*>& Components, v
             {
                 if(c !=stimuli.size())
                 {
-                    InputChecker(stimuli,Inputs,c, outputFile,time); //apply the changes to the next input through the event
+                    InputChecker(stimuli,Inputs,c,time, SortedOutput); //apply the changes to the next input through the event
                     c++; //go to the next character
                     i = c-1; //change the i accordingly (accelerating the for loop)
 
@@ -460,7 +522,7 @@ void Simulation(vector <stimulus*>& stimuli, vector <Components*>& Components, v
         
         for (int j = 0; j < Components.size(); j++)
         {
-            postfix_to_bool(Components[j], Postfix(Components[j]), time, outputFile); //get the boolean expression of the now changed inputs
+            postfix_to_bool(Components[j], Postfix(Components[j]), time, FirstSim, SortedOutput); //get the boolean expression of the now changed inputs
 
         }
 
@@ -474,6 +536,104 @@ void Simulation(vector <stimulus*>& stimuli, vector <Components*>& Components, v
        cout << Components[i]->output->name << endl;
        cout << Components[i]->output->value << endl << endl;
    }
+}
+
+void PrintInSim(QString filePath4, vector<BoolVar>& SortedOutput)
+{
+   ofstream outputFile(filePath4.toStdString()); //the file that we will write to
+   if(!outputFile.is_open()) //error handling if the file did not open
+   {
+       QMessageBox::critical(nullptr, "error", "Unable To Open The File");
+       exit(0);
+   }
+   outputFile.clear();
+
+   for(int i=0; i<SortedOutput.size(); i++)
+   {
+       if(SortedOutput[i].currtime != 0)
+       {
+            outputFile << SortedOutput[i].currtime << ", " << SortedOutput[i].name << ", " << SortedOutput[i].value << endl;
+       }
+   }
+
+   outputFile.close();
+}
+
+int MaxValueGrabber(vector<BoolVar>& SortedOutput)
+{
+   int max = SortedOutput[0].currtime;
+   for(int i =1; i< SortedOutput.size(); i++)
+   {
+       if(SortedOutput[i].currtime > max)
+       {
+            max = SortedOutput[i].currtime;
+       }
+   }
+
+   return max;
+}
+
+void DrawTimeGraphs(vector<BoolVar>& SortedOutput)
+{
+   QChartView* chartView = new QChartView();
+   QChart*  chart = new QChart();
+   vector<QLineSeries*> lines;
+   QValueAxis* axisX = new QValueAxis;
+   QValueAxis* axisY = new QValueAxis;
+   vector<int> lastpoint;
+   int max = MaxValueGrabber(SortedOutput);
+
+   // Set range and labels for the X axis
+   axisX->setRange(0, max);
+   axisX->setLabelFormat("%.0f"); // Format for axis labels (optional)
+   axisX->setTitleText("Time"); // Axis title
+
+   // Set range and labels for the Y axis
+   axisY->setRange(0, SortedOutput.size());
+   axisY->setLabelFormat("%.0f"); // Format for axis labels (optional)
+   axisY->setTitleText("Output"); // Axis title
+   chart->setLocalizeNumbers(true);
+
+   // Add axes to the chart
+   chart->addAxis(axisX, Qt::AlignBottom);
+   chart->addAxis(axisY, Qt::AlignLeft);
+
+   for(int i = 0; i<SortedOutput.size(); i++)
+   {
+       if(SortedOutput[i].currtime==0)
+       {
+            lines.push_back(new QLineSeries());
+            lines[i]->setName(QString::fromStdString(SortedOutput[i].name));
+            //lines[i]->append(2*SortedOutput.size(),static_cast<int>(SortedOutput[i].value)+i+1);
+            lines[i]->append(SortedOutput[i].currtime,static_cast<int>(SortedOutput[i].value)+i+1);
+       }
+       else
+       {
+            for(int j =0; j<lines.size(); j++)
+            {
+                if(lines[j]->name().toStdString() == SortedOutput[i].name)
+                {
+                    lines[j]->append(SortedOutput[i].currtime,static_cast<int>(!SortedOutput[i].value)+j+1);
+                    lines[j]->append(SortedOutput[i].currtime,static_cast<int>(SortedOutput[i].value)+j+1);
+                    lines[j]->append(max,static_cast<int>(SortedOutput[i].value)+j+1);
+
+                }
+
+            }
+       }
+
+   }
+
+   for(int i = 0; i<lines.size(); i++)
+   {
+       chart->addSeries(lines[i]);
+       lines[i]->attachAxis(axisX);
+       lines[i]->attachAxis(axisY);
+   }
+
+   chartView->setChart(chart);
+   chartView->show();
+
 }
 
 
@@ -497,8 +657,16 @@ int main(int argc, char *argv[])
     vector<BoolVar*> inputs; //create instance of BoolVar
     vector<Components*> components; //create instance of Components
     vector<stimulus*> stimuli;
+    vector<BoolVar> SortedOutput;
     ReadLibrary(gates, filePath); //read the library file and write into the gates vector
     ReadCircuit(gates, components, inputs, filePath2); //read the circuit file and write into components and inputs vectors
     ReadStimulus(stimuli,inputs,filePath3);
-    Simulation(stimuli,components,inputs,filePath4);
+    Simulation(stimuli,components,inputs, SortedOutput);
+    PrintInSim(filePath4, SortedOutput);
+    DrawTimeGraphs(SortedOutput);
+    for(int i= 0; i<SortedOutput.size(); i++)
+    {
+       cout << SortedOutput[i].currtime << ", " << SortedOutput[i].name << ", " << SortedOutput[i].value << endl;
+    }
+    return a.exec();
 }

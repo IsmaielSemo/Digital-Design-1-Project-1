@@ -3,6 +3,6 @@ A
 B
 C
 COMPONENTS:
-G0, NOR1, X, A, B
-G1, OR1, Y, X, C
+G0, NOR2, X, A, B
+G1, OR2, Y, X, C
 G2, AND2, Z, Y, X
