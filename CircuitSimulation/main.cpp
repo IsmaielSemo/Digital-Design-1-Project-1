@@ -42,7 +42,6 @@ class stimulus //class for the stimulus file
 {
 public:
     int time_stamp_ps; //time at which event begins
-
     BoolVar* input; //the variable that changes (instantiated using pointer of BoolVar)
     bool new_value; //the new value to be assigned to the variable
 
@@ -69,6 +68,33 @@ void SortedAddition(BoolVar value, vector<BoolVar>& SortedOutput) {
     // Find the appropriate position to insert value while maintaining sorted order
     for (int i = 0; i < SortedOutput.size(); ++i) {
         if (value.currtime <= SortedOutput[i].currtime) {
+            SortedOutput.insert(SortedOutput.begin() + i, value);
+            return;
+        }
+    }
+}
+
+void SortedStimuli(stimulus *value, vector<stimulus*>& SortedOutput) {
+    if (SortedOutput.empty()) {
+        SortedOutput.push_back(value);
+        return;
+    }
+
+    // Case: value's time_stamp is smaller than the first element in SortedOutput
+    if (value->time_stamp_ps <= SortedOutput.front()->time_stamp_ps) {
+        SortedOutput.insert(SortedOutput.begin(), value);
+        return;
+    }
+
+    // Case: value's time_stamp is larger than the last element in SortedOutput
+    if (value->time_stamp_ps >= SortedOutput.back()->time_stamp_ps) {
+        SortedOutput.push_back(value);
+        return;
+    }
+
+    // Find the appropriate position to insert value while maintaining sorted order
+    for (int i = 0; i < SortedOutput.size(); ++i) {
+        if (value->time_stamp_ps <= SortedOutput[i]->time_stamp_ps) {
             SortedOutput.insert(SortedOutput.begin() + i, value);
             return;
         }
@@ -234,13 +260,21 @@ void postfix_to_bool(Components* component, string postfix, int& time, bool& fir
 
     for(int i = 0; i<postfix.size(); i++) //while we are still in the postfix expression
     {
-        if(postfix[i] == 'i') //if the character is "i", meaning it isn't bitwise or parenthesis
+        if(postfix[i] != '&' && postfix[i] != '|' && postfix[i] != '^' && postfix[i] != '~') //if the character is "i", meaning it isn't bitwise or parenthesis
         {
             NextChar = postfix[++i]; //get the next character
             if(NextChar >= '0' && NextChar <= '9') //if next character is a number from 0 to 9
             {
                 index = NextChar - '0'; //get its index
                 holderstack.push(component->inputs[index-1]); //push it to stack
+            }
+            else if(NextChar >= 'a' && NextChar <= 'z'){
+                index = NextChar - 'a';
+                holderstack.push(component->inputs[index]); //push it to stack
+            }
+            else if(NextChar >= 'A' && NextChar <= 'Z'){
+                index = NextChar - 'A';
+                holderstack.push(component->inputs[index]); //push it to stack
             }
             else
             {
@@ -433,7 +467,8 @@ void ReadStimulus(vector <stimulus*> &stimuli, vector<BoolVar*>& Inputs, QString
             }
             getline(inputFile,line,'\n');
             stimuluss->new_value=stoi(line); //the functionality is inserted
-            stimuli.push_back(stimuluss);
+            SortedStimuli(stimuluss,stimuli);
+            //stimuli.push_back(stimulus);
         }
         inputFile.close(); //close the file
     }
@@ -442,6 +477,8 @@ void ReadStimulus(vector <stimulus*> &stimuli, vector<BoolVar*>& Inputs, QString
         cout << "Unable to open file";
         exit(0);
     }
+    for(int i = 0; i < stimuli.size();i++)
+           cout << stimuli[i]->input << " " << stimuli[i]->time_stamp_ps << endl;
 }
 
 
@@ -604,7 +641,7 @@ void DrawTimeGraphs(vector<BoolVar>& SortedOutput)
        {
             lines.push_back(new QLineSeries());
             lines[i]->setName(QString::fromStdString(SortedOutput[i].name));
-            //lines[i]->append(2*SortedOutput.size(),static_cast<int>(SortedOutput[i].value)+i+1);
+            lines[i]->append(2*SortedOutput.size(),static_cast<int>(SortedOutput[i].value)+i+1);
             lines[i]->append(SortedOutput[i].currtime,static_cast<int>(SortedOutput[i].value)+i+1);
        }
        else
@@ -620,7 +657,7 @@ void DrawTimeGraphs(vector<BoolVar>& SortedOutput)
                 }
 
             }
-       }
+      }
 
    }
 
