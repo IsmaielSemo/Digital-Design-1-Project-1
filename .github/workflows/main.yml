@@ -1,0 +1,26 @@
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v2
+
+    - name: Install QT dependencies
+      run: sudo apt-get install qt5-default
+
+    - name: Configure and build QT project
+      run: |
+        qmake
+        make
+
+    - name: Run tests
+      run: ./run_tests.sh
