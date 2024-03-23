@@ -1,0 +1,25 @@
+name: CI
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v2
+
+    - name: Install Qt dependencies
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y wget
+        wget https://raw.githubusercontent.com/qt/qtci/main/bin/extract-qt-installer
+        chmod +x extract-qt-installer
+        ./extract-qt-installer qt-unified-linux-x64-online.run $HOME/Qt
