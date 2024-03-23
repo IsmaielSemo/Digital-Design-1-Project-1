@@ -248,7 +248,7 @@ string Postfix(Components* component) //function that turns the components to an
     return postfix; //return the components functionality now in postfix format as a string
  }
 
-void postfix_to_bool(Components* component, string postfix, int& time, bool& firstsim, vector<BoolVar>& SortedOutput) //function that transforms a postfix expression to a boolean one
+void postfix_to_bool(Components* component, string postfix, int& time, bool firstsim, vector<BoolVar>& SortedOutput) //function that transforms a postfix expression to a boolean one
 {//parameters are the components pointer, the postfix string (generated from the previous function), the time (for the simulation) and the output file
     BoolVar* holder1; //BoolVar pointer for input1
     BoolVar* holder2; //BoolVar pointer for input2
@@ -267,14 +267,6 @@ void postfix_to_bool(Components* component, string postfix, int& time, bool& fir
             {
                 index = NextChar - '0'; //get its index
                 holderstack.push(component->inputs[index-1]); //push it to stack
-            }
-            else if(NextChar >= 'a' && NextChar <= 'z'){
-                index = NextChar - 'a';
-                holderstack.push(component->inputs[index]); //push it to stack
-            }
-            else if(NextChar >= 'A' && NextChar <= 'Z'){
-                index = NextChar - 'A';
-                holderstack.push(component->inputs[index]); //push it to stack
             }
             else
             {
@@ -298,9 +290,6 @@ void postfix_to_bool(Components* component, string postfix, int& time, bool& fir
             time = holder2->currtime;
             holderstack.pop(); //pop it
             holderstack.push(character_to_operator(holder2,holder2,postfix[i], component)); //push in the stack the result of the operation of postfix[i] on holder2 in component
-
-
-
         }
     }
     oldvalue = component->output->value; //old value of component
@@ -377,62 +366,66 @@ void ReadCircuit(vector<LogicGates*>& gates ,vector<Components*>& components, ve
         {
             while (getline(inputFile, line, ','))
             {
-                Components* component = new Components();
-                component->component_name = line; //adding components name
-                getline(inputFile, line, ',');
-                line = fileOptimizer(line);
-                for (int i = 0; i < gates.size(); i++) //opening the vector gates
+                if(line != "")
                 {
-                    if (gates[i]->component_name == line) //if the component name matches what's in the file
+                    Components* component = new Components();
+                    component->component_name = line; //adding components name
+                    getline(inputFile, line, ',');
+                    line = fileOptimizer(line);
+                    for (int i = 0; i < gates.size(); i++) //opening the vector gates
                     {
-                        component->gate = *gates[i]; //add it to the logic gate part of component
-                    }
-                }
-                getline(inputFile, line, ','); //move to the next part
-                line = fileOptimizer(line);
-                component->output = new BoolVar();
-                component->output->name = line; //add the output names to component
-                component->output->value = false;
-                inputs.push_back(component->output);
-                for (int i = 0; i < component->gate.inputs; i++) //checking if inputs is repeated or no
-                {
-                    if(i != component->gate.inputs - 1)
-                    {
-                        getline(inputFile, line, ','); //move to the next part
-                        line = fileOptimizer(line);
-                    }
-                    else
-                    {
-                        getline(inputFile, line, '\n');
-                        line = fileOptimizer(line);
-                    }
-
-                    found = false; //assuming no repetitions
-                    for (int j = 0; j < inputs.size(); j++) // looping over the number of inputs
-                    {
-                        if (inputs[j]->name == line) //if inputs match
+                        if (gates[i]->component_name == line) //if the component name matches what's in the file
                         {
-                            component->inputs.push_back(inputs[j]); //push the input
-                            found = true; //it has been found!
-                            break; //exit for loop
+                            component->gate = *gates[i]; //add it to the logic gate part of component
+                        }
+                    }
+                    getline(inputFile, line, ','); //move to the next part
+                    line = fileOptimizer(line);
+                    component->output = new BoolVar();
+                    component->output->name = line; //add the output names to component
+                    component->output->value = false;
+                    inputs.push_back(component->output);
+                    for (int i = 0; i < component->gate.inputs; i++) //checking if inputs is repeated or no
+                    {
+                        if(i != component->gate.inputs - 1)
+                        {
+                            getline(inputFile, line, ','); //move to the next part
+                            line = fileOptimizer(line);
+                        }
+                        else
+                        {
+                            getline(inputFile, line, '\n');
+                            line = fileOptimizer(line);
                         }
 
+                        found = false; //assuming no repetitions
+                        for (int j = 0; j < inputs.size(); j++) // looping over the number of inputs
+                        {
+                            if (inputs[j]->name == line) //if inputs match
+                            {
+                                component->inputs.push_back(inputs[j]); //push the input
+                                found = true; //it has been found!
+                                break; //exit for loop
+                            }
+
+                        }
+
+
+                        if (found == false)
+                        {
+                            BoolVar* input = new BoolVar(); //create a new input
+                            line = fileOptimizer(line) ;
+                            input->name = line; //puts its name
+                            input->value = false; //puts its value
+                            component->inputs.push_back(input); //push back
+
+                        }
+
+
                     }
-
-
-                    if (found == false)
-                    {
-                        BoolVar* input = new BoolVar(); //create a new input
-                        line = fileOptimizer(line) ;
-                        input->name = line; //puts its name
-                        input->value = false; //puts its value
-                        component->inputs.push_back(input); //push back
-
-                    }
-
-
+                    components.push_back(component); //push back the component
                 }
-                components.push_back(component); //push back the component
+
 
             }
         }
@@ -454,21 +447,25 @@ void ReadStimulus(vector <stimulus*> &stimuli, vector<BoolVar*>& Inputs, QString
         string line;
         while (getline(inputFile, line, ',')) //while there are still lines
         {
-            stimulus* stimuluss = new stimulus(); //declare a gate
-            stimuluss->time_stamp_ps=stoi(line); //gate component is inserted
-            getline(inputFile, line, ','); //read the next part of the line
-            line=fileOptimizer(line); //number of inputs is inserted
-            for(int i = 0; i < Inputs.size(); i++)
+            if(line != "")
             {
-                if(line == Inputs[i]->name)
+                stimulus* stimuluss = new stimulus(); //declare a gate
+                stimuluss->time_stamp_ps=stoi(line); //gate component is inserted
+                getline(inputFile, line, ','); //read the next part of the line
+                line=fileOptimizer(line);
+                    //number of inputs is inserted
+                for(int i = 0; i < Inputs.size(); i++)
                 {
-                    stimuluss->input = Inputs[i];
+                    if(line == Inputs[i]->name)
+                    {
+                        stimuluss->input = Inputs[i];
+                    }
                 }
+                getline(inputFile,line,'\n');
+                stimuluss->new_value=stoi(line); //the functionality is inserted
+                SortedStimuli(stimuluss,stimuli);
             }
-            getline(inputFile,line,'\n');
-            stimuluss->new_value=stoi(line); //the functionality is inserted
-            SortedStimuli(stimuluss,stimuli);
-            //stimuli.push_back(stimulus);
+
         }
         inputFile.close(); //close the file
     }
@@ -478,7 +475,7 @@ void ReadStimulus(vector <stimulus*> &stimuli, vector<BoolVar*>& Inputs, QString
         exit(0);
     }
     for(int i = 0; i < stimuli.size();i++)
-           cout << stimuli[i]->input << " " << stimuli[i]->time_stamp_ps << endl;
+        cout << stimuli[i]->input->name << " " << stimuli[i]->time_stamp_ps << endl;
 }
 
 
@@ -603,7 +600,7 @@ int MaxValueGrabber(vector<BoolVar>& SortedOutput)
    {
        if(SortedOutput[i].currtime > max)
        {
-            max = SortedOutput[i].currtime;
+            max = SortedOutput[i].currtime +1000;
        }
    }
 
@@ -626,7 +623,7 @@ void DrawTimeGraphs(vector<BoolVar>& SortedOutput)
    axisX->setTitleText("Time"); // Axis title
 
    // Set range and labels for the Y axis
-   axisY->setRange(0, SortedOutput.size());
+   axisY->setRange(0, 1.5*float(SortedOutput.size()));
    axisY->setLabelFormat("%.0f"); // Format for axis labels (optional)
    axisY->setTitleText("Output"); // Axis title
    chart->setLocalizeNumbers(true);
@@ -641,8 +638,11 @@ void DrawTimeGraphs(vector<BoolVar>& SortedOutput)
        {
             lines.push_back(new QLineSeries());
             lines[i]->setName(QString::fromStdString(SortedOutput[i].name));
-            lines[i]->append(2*SortedOutput.size(),static_cast<int>(SortedOutput[i].value)+i+1);
-            lines[i]->append(SortedOutput[i].currtime,static_cast<int>(SortedOutput[i].value)+i+1);
+            lines[i]->setColor(QColor::fromRgb(rand()%256, rand()%256, rand()%256 ));
+            lines[i]->append(2*SortedOutput.size(),static_cast<int>(SortedOutput[i].value)+2*(i+1));
+            lines[i]->append(SortedOutput[i].currtime,static_cast<int>(SortedOutput[i].value)+2*(i+1));
+            lines[i]->append(max, static_cast<int>(SortedOutput[i].value)+2*(i+1));
+
        }
        else
        {
@@ -650,9 +650,10 @@ void DrawTimeGraphs(vector<BoolVar>& SortedOutput)
             {
                 if(lines[j]->name().toStdString() == SortedOutput[i].name)
                 {
-                    lines[j]->append(SortedOutput[i].currtime,static_cast<int>(!SortedOutput[i].value)+j+1);
-                    lines[j]->append(SortedOutput[i].currtime,static_cast<int>(SortedOutput[i].value)+j+1);
-                    lines[j]->append(max,static_cast<int>(SortedOutput[i].value)+j+1);
+                    lines[j]->remove(max,static_cast<int>(!SortedOutput[i].value)+2*(j+1));
+                    lines[j]->append(SortedOutput[i].currtime,static_cast<int>(!SortedOutput[i].value)+2*(j+1));
+                    lines[j]->append(SortedOutput[i].currtime,static_cast<int>(SortedOutput[i].value)+2*(j+1));
+                    lines[j]->append(max,static_cast<int>(SortedOutput[i].value)+2*(j+1));
 
                 }
 
@@ -705,5 +706,9 @@ int main(int argc, char *argv[])
     {
        cout << SortedOutput[i].currtime << ", " << SortedOutput[i].name << ", " << SortedOutput[i].value << endl;
     }
+//    for(int i= 0; i<components.size(); i++)
+//    {
+//       cout << components[i]->component_name << endl;
+//    }
     return a.exec();
 }
