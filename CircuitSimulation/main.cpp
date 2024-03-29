@@ -45,6 +45,7 @@ public:
     BoolVar* input; //the variable that changes (instantiated using pointer of BoolVar)
     bool new_value; //the new value to be assigned to the variable
 
+
 };
 
 void SortedAddition(BoolVar value, vector<BoolVar>& SortedOutput) {
@@ -255,8 +256,8 @@ void postfix_to_bool(Components* component, string postfix, int& time, bool firs
     stack<BoolVar*> holderstack; //stack of BoolVar pointer
     char NextChar; 
     int index;
-    int timecontroller;
     bool oldvalue;
+
 
     for(int i = 0; i<postfix.size(); i++) //while we are still in the postfix expression
     {
@@ -309,6 +310,81 @@ void postfix_to_bool(Components* component, string postfix, int& time, bool firs
         SortedAddition(*component->output, SortedOutput);
     }
     holderstack.pop();
+}
+
+void postfix_to_bool_Sequential(Components* component, string postfix, int& time, bool firstsim, vector<BoolVar>& SortedOutput)
+{
+    BoolVar* holder1; //BoolVar pointer for input1
+    BoolVar* holder2; //BoolVar pointer for input2
+    stack<BoolVar*> holderstack; //stack of BoolVar pointer
+    char NextChar;
+    int index;
+    bool oldvalue;
+
+    for(int i = 0; i<postfix.size(); i++) //while we are still in the postfix expression
+    {
+        if(postfix[i] != '&' && postfix[i] != '|' && postfix[i] != '^' && postfix[i] != '~') //if the character is "i", meaning it isn't bitwise or parenthesis
+        {
+            NextChar = postfix[++i]; //get the next character
+            if(NextChar >= '0' && NextChar <= '9') //if next character is a number from 0 to 9
+            {
+                index = NextChar - '0'; //get its index
+                holderstack.push(component->inputs[index-1]); //push it to stack
+            }
+            else
+            {
+                throw QMessageBox::critical(nullptr, "error", "Invalid Naming scheme in the .Lib file");
+                exit(0);
+            }
+        }
+        else if(postfix[i] == '&' || postfix[i] == '|' || postfix[i] == '^') //if the character is a bitwise operator
+        {
+            holder2 = holderstack.top(); //get the top element and store it in holder2
+            holderstack.pop(); //pop it
+            holder1 = holderstack.top(); //get the new top and store it in holder1
+            holderstack.pop(); //pop it
+            if((time == holder1->currtime) || (time == holder2->currtime))
+            {
+                holderstack.push(character_to_operator(holder2, holder1, postfix[i], component));
+            }
+            else
+            {
+                return;
+            }
+
+             //push in the stack the result of the operation of postfix[i] on holder1 and 2 and store it in component, making use of the character_to_operator function
+
+
+        }
+        else if(postfix[i] == '~') //if the character is the negation operator
+        {
+            holder2 = holderstack.top(); //get the top in the stack
+            holderstack.pop(); //pop it
+            if(time == holder2->currtime)
+            {
+                holderstack.push(character_to_operator(holder2,holder2,postfix[i], component));
+            }
+            else
+            {
+                return;
+            }
+
+        }
+    }
+    oldvalue = component->output->value; //old value of component
+    component->output ->value = holderstack.top()->value; //the new value of component (as reached above)
+    if(firstsim)
+    {
+        component->output->currtime = 0;
+
+    }
+    else if(component->output->value != oldvalue)
+    {
+        component->output->currtime = time + component->gate.delayps;
+        SortedAddition(*component->output, SortedOutput);
+    }
+    holderstack.pop();
+
 }
 
 void ReadLibrary(vector<LogicGates*>& gates, QString path) //function that reads the Lib file
@@ -381,9 +457,20 @@ void ReadCircuit(vector<LogicGates*>& gates ,vector<Components*>& components, ve
                     }
                     getline(inputFile, line, ','); //move to the next part
                     line = fileOptimizer(line);
-                    component->output = new BoolVar();
-                    component->output->name = line; //add the output names to component
-                    component->output->value = false;
+                    for(int i = 0; i<inputs.size(); i++)
+                    {
+                        if(inputs[i]->name == line)
+                        {
+                            component->output = inputs[i];
+                        }
+                        else
+                        {
+                            component->output = new BoolVar();
+                            component->output->name = line; //add the output names to component
+                            component->output->value = false;
+                        }
+
+                    }
                     inputs.push_back(component->output);
                     for (int i = 0; i < component->gate.inputs; i++) //checking if inputs is repeated or no
                     {
@@ -418,6 +505,7 @@ void ReadCircuit(vector<LogicGates*>& gates ,vector<Components*>& components, ve
                             input->name = line; //puts its name
                             input->value = false; //puts its value
                             component->inputs.push_back(input); //push back
+                            inputs.push_back(input);
 
                         }
 
@@ -441,6 +529,7 @@ void ReadCircuit(vector<LogicGates*>& gates ,vector<Components*>& components, ve
 void ReadStimulus(vector <stimulus*> &stimuli, vector<BoolVar*>& Inputs, QString path)
 {
     ifstream inputFile(path.toStdString()); //reading the file
+    string error;
 
     if (inputFile.is_open()) //if successfully opened
     {
@@ -463,7 +552,21 @@ void ReadStimulus(vector <stimulus*> &stimuli, vector<BoolVar*>& Inputs, QString
                 }
                 getline(inputFile,line,'\n');
                 stimuluss->new_value=stoi(line); //the functionality is inserted
-                SortedStimuli(stimuluss,stimuli);
+                if(stimuluss->time_stamp_ps == 0 && stimuluss->new_value == 0)
+                {
+                    error = "Stimuli Removed: " + to_string(stimuluss->time_stamp_ps) + ", " + stimuluss->input->name + ", " + to_string(stimuluss->new_value) + " is Redundant";
+                    QMessageBox::information(nullptr, "Information", QString::fromStdString(error));
+                }
+                else if(stimuluss->time_stamp_ps == 0 && stimuluss->new_value == 1)
+                {
+                   stimuluss->input->value = stimuluss->new_value;
+                   SortedStimuli(stimuluss,stimuli);
+                }
+                else
+                {
+                   SortedStimuli(stimuluss,stimuli);
+                }
+
             }
 
         }
@@ -490,16 +593,20 @@ void FileErrorHandling(QString path) //function that handles error
 
 void InputChecker(vector <stimulus*>& stimuli, vector <BoolVar*>& Inputs, int i, int& time, vector<BoolVar>& SortedOutput) //function that updates the input parameters (value and time) based on the information in the stimuli file
 {
-    for(int j = 0; j<Inputs.size(); j++) //while there are inputs to explore
+    stimuli[i]->input->value = stimuli[i]->new_value;
+    stimuli[i]->input->currtime = stimuli[i]->time_stamp_ps;
+    SortedAddition(*stimuli[i]->input, SortedOutput);
+}
+
+bool HandleRedundantStim(vector <stimulus*>& stimuli,int x)
+{
+    if(stimuli[x]->new_value == stimuli[x]->input->value)
     {
-
-        if(stimuli[i]->input->name == Inputs[j]->name) //if the inputs match
-        {
-            Inputs[j]->value = stimuli[i]->new_value; //change the value to that in the stimulus file
-            Inputs[j]->currtime = stimuli[i]->time_stamp_ps; //update the time likewise to when the event takes place
-            SortedAddition(*Inputs[j],SortedOutput);
-        }
-
+        return true;
+    }
+    else
+    {
+        return false;
     }
 }
 
@@ -510,6 +617,8 @@ void Simulation(vector <stimulus*>& stimuli, vector <Components*>& Components, v
     int time = 0; //time of simulation
     int c = 0;
     bool FirstSim = true;
+    auto it = stimuli.begin();
+    string error;
 
 
 
@@ -532,6 +641,16 @@ void Simulation(vector <stimulus*>& stimuli, vector <Components*>& Components, v
 
     for(int i = 0; i<stimuli.size(); i++)
     {
+
+        if(HandleRedundantStim(stimuli, i))
+        {
+            error = "Removed " + stimuli[i]->input->name + ", " + to_string(stimuli[i]->time_stamp_ps) + ", " +to_string(stimuli[i]->new_value) + ": It was Redundant";
+            QMessageBox::information(nullptr, "Information", QString::fromStdString(error));
+            stimuli.erase(it);
+            i--;
+            continue;
+        }
+
         c = i+1; //check the following input
 
         time = stimuli[i]->time_stamp_ps; //get the time of the input we are at
@@ -560,7 +679,7 @@ void Simulation(vector <stimulus*>& stimuli, vector <Components*>& Components, v
 
         }
 
-
+        it++;
     }
 
 
@@ -570,6 +689,91 @@ void Simulation(vector <stimulus*>& stimuli, vector <Components*>& Components, v
        cout << Components[i]->output->name << endl;
        cout << Components[i]->output->value << endl << endl;
    }
+}
+
+void SequentialSimulator(vector <stimulus*>& stimuli, vector <Components*>& Components, vector <BoolVar*>& Inputs, vector<BoolVar>& SortedOutput)
+{
+   string postfix; //string to be used for postfix
+   bool FirstSim = true;
+   auto it = stimuli.begin();
+   int initial_time = 0;
+   string error;
+   int stimcount = 0;
+
+
+
+   for (int j = 0; j < Components.size(); j++)
+   {
+       postfix_to_bool(Components[j], Postfix(Components[j]), initial_time , FirstSim, SortedOutput); //will generate a boolean expression given components, a postfix expression, and the time (outputs to file)
+
+   }
+
+   FirstSim = false;
+
+   for (int i = 0; i <Inputs.size(); i++)
+   {
+       if(Inputs[i]->value == 0)
+       {
+            SortedAddition(*Inputs[i], SortedOutput);
+       }
+   }
+
+   for(int i=1; i <1000000; i++)
+   {
+       if(stimcount != stimuli.size())
+       {
+        while((stimuli[stimcount]->time_stamp_ps == i))
+            {
+                if(HandleRedundantStim(stimuli, stimcount))
+                {
+                    error = "Removed " + stimuli[stimcount]->input->name + ", " + to_string(stimuli[stimcount]->time_stamp_ps) + ", " +to_string(stimuli[stimcount]->new_value) + ": It was Redundant";
+                    QMessageBox::information(nullptr, "Information", QString::fromStdString(error));
+                    stimuli.erase(it);
+
+                }
+                else
+                {
+                    InputChecker(stimuli,Inputs,stimcount, i, SortedOutput);
+                    stimcount++;
+                    it++;
+                    if(stimcount == stimuli.size())
+                    {
+                        break;
+                    }
+                 }
+            }
+       }
+
+       for (int j = 0; j < Components.size(); j++)
+       {
+            postfix_to_bool_Sequential(Components[j], Postfix(Components[j]),i, FirstSim, SortedOutput); //get the boolean expression of the now changed inputs
+
+       }
+
+
+   }
+}
+
+bool SequentialDetector(vector <Components*>& Components)
+{
+   for(int i = 0; i<Components.size()-1; i++)
+   {
+       for(int j = i+1; j<Components.size(); j++)
+       {
+            for(int k = 0; k<Components[i]->inputs.size(); k++)
+            {
+                for(int l=0; l<Components[j]->inputs.size(); l++)
+                {
+                    if((Components[i]->output->name == Components[j]->inputs[l]->name) && (Components[i]->inputs[k]->name == Components[j]->output->name))
+                    {
+                        return true;
+                    }
+                }
+            }
+       }
+   }
+
+   return false;
 }
 
 void PrintInSim(QString filePath4, vector<BoolVar>& SortedOutput)
@@ -607,7 +811,7 @@ int MaxValueGrabber(vector<BoolVar>& SortedOutput)
    return max;
 }
 
-void DrawTimeGraphs(vector<BoolVar>& SortedOutput)
+void DrawTimeGraphs(vector<BoolVar>& SortedOutput, bool SequentialFlag, int inputsize)
 {
    QChartView* chartView = new QChartView();
    QChart*  chart = new QChart();
@@ -620,23 +824,43 @@ void DrawTimeGraphs(vector<BoolVar>& SortedOutput)
    // Set range and labels for the X axis
    axisX->setRange(0, max);
    axisX->setLabelFormat("%.0f"); // Format for axis labels (optional)
-   axisX->setTitleText("Time"); // Axis title
+   axisX->setTitleText("Time/ps"); // Axis title
+   axisX->applyNiceNumbers();
+   axisX->setLabelsColor(Qt::white);
+   axisX->setTitleBrush(Qt::white);
 
    // Set range and labels for the Y axis
-   axisY->setRange(0, 1.5*float(SortedOutput.size()));
+   if(SequentialFlag)
+   {
+       axisY->setRange(0, 3*float(inputsize));
+   }
+   else
+   {
+        axisY->setRange(0, 1.5*float(SortedOutput.size()));
+   }
+
+   axisY->setLabelsVisible(true);
    axisY->setLabelFormat("%.0f"); // Format for axis labels (optional)
    axisY->setTitleText("Output"); // Axis title
+   axisY->setLabelsColor(Qt::white);
+   axisY->setTitleBrush(Qt::white);
    chart->setLocalizeNumbers(true);
 
    // Add axes to the chart
+   chart->setTitleBrush(Qt::white);
+   chart->setTheme(QChart::ChartTheme::ChartThemeBlueCerulean);
    chart->addAxis(axisX, Qt::AlignBottom);
    chart->addAxis(axisY, Qt::AlignLeft);
+
+   QPen* Pen = new QPen();
+   Pen->setWidth(6);
 
    for(int i = 0; i<SortedOutput.size(); i++)
    {
        if(SortedOutput[i].currtime==0)
        {
             lines.push_back(new QLineSeries());
+            lines[i]->setPen(*Pen);
             lines[i]->setName(QString::fromStdString(SortedOutput[i].name));
             lines[i]->setColor(QColor::fromRgb(rand()%256, rand()%256, rand()%256 ));
             lines[i]->append(2*SortedOutput.size(),static_cast<int>(SortedOutput[i].value)+2*(i+1));
@@ -669,7 +893,10 @@ void DrawTimeGraphs(vector<BoolVar>& SortedOutput)
        lines[i]->attachAxis(axisY);
    }
 
+   chart->setBackgroundBrush(Qt::black);
+   chart->zoom(1000000);
    chartView->setChart(chart);
+   chartView->setRubberBand(QChartView::HorizontalRubberBand);
    chartView->show();
 
 }
@@ -696,19 +923,29 @@ int main(int argc, char *argv[])
     vector<Components*> components; //create instance of Components
     vector<stimulus*> stimuli;
     vector<BoolVar> SortedOutput;
+    bool Sequentialflag;
     ReadLibrary(gates, filePath); //read the library file and write into the gates vector
     ReadCircuit(gates, components, inputs, filePath2); //read the circuit file and write into components and inputs vectors
     ReadStimulus(stimuli,inputs,filePath3);
-    Simulation(stimuli,components,inputs, SortedOutput);
+    Sequentialflag = SequentialDetector(components);
+    if(Sequentialflag)
+    {
+       SequentialSimulator(stimuli,components,inputs, SortedOutput);
+       DrawTimeGraphs(SortedOutput, Sequentialflag, inputs.size());
+    }
+    else
+    {
+       Simulation(stimuli,components,inputs, SortedOutput);
+       DrawTimeGraphs(SortedOutput, Sequentialflag, inputs.size());
+
+    }
+
     PrintInSim(filePath4, SortedOutput);
-    DrawTimeGraphs(SortedOutput);
+
     for(int i= 0; i<SortedOutput.size(); i++)
     {
        cout << SortedOutput[i].currtime << ", " << SortedOutput[i].name << ", " << SortedOutput[i].value << endl;
     }
-//    for(int i= 0; i<components.size(); i++)
-//    {
-//       cout << components[i]->component_name << endl;
-//    }
+
     return a.exec();
 }
