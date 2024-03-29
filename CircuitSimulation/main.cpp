@@ -9,6 +9,10 @@
 #include <QMessageBox>
 #include <stack>
 #include <QtCharts/QtCharts>
+#include <unistd.h>
+#include <QCoreApplication>
+#include <QDebug>
+#include <windows.h>
 using namespace std;
 
 class LogicGates //Logic Gates class based on the provided description in the project file
@@ -412,6 +416,7 @@ void ReadLibrary(vector<LogicGates*>& gates, QString path) //function that reads
         string line;
         while (getline(inputFile, line, ',')) //while there are still lines
         {
+            line = fileOptimizer(line);
             LogicGates* gate = new LogicGates(); //declare a gate
             gate->component_name = line; //gate component is inserted
             getline(inputFile, line, ','); //read the next part of the line
@@ -421,6 +426,11 @@ void ReadLibrary(vector<LogicGates*>& gates, QString path) //function that reads
             gate->functionality = line; //the functionality is inserted
             getline(inputFile, line, '\n'); //read the next part
             gate->delayps = stoi(line); //add the delay component
+            if(gate->delayps < 0)
+            {
+                throw QMessageBox::critical(nullptr, "Error", "Negative Delay is not allowed");
+                exit(0);
+            }
             gates.push_back(gate); //push back in gates vectors
         }
         inputFile.close(); //close the file
@@ -467,12 +477,18 @@ void ReadCircuit(vector<LogicGates*>& gates ,vector<Components*>& components, ve
                     component->component_name = line; //adding components name
                     getline(inputFile, line, ',');
                     line = fileOptimizer(line);
+                    component->gate.component_name = " ";
                     for (int i = 0; i < gates.size(); i++) //opening the vector gates
                     {
                         if (gates[i]->component_name == line) //if the component name matches what's in the file
                         {
                             component->gate = *gates[i]; //add it to the logic gate part of component
                         }
+                    }
+                    if(component->gate.component_name == " ")
+                    {
+                        QMessageBox::critical(nullptr, "Error", "Unknown Logic Gate"); //if user did not select a file at the beginning
+                        exit(0);
                     }
                     getline(inputFile, line, ','); //move to the next part
                     line = fileOptimizer(line);
@@ -531,7 +547,7 @@ void ReadCircuit(vector<LogicGates*>& gates ,vector<Components*>& components, ve
                             input->name = line; //puts its name
                             input->value = false; //puts its value
                             component->inputs.push_back(input); //push back
-                            info = "Component Name: "+ component->component_name + ", " + "Input: " + input->name + ", is always set to 0" ;
+                            info = "Component Name: "+ component->component_name + ", " + "Input: " + input->name + ", is either always set to 0, or is part of a Sequential Circuit" ;
                             QMessageBox::information(nullptr, "Information", QString::fromStdString(info));
                             inputs.push_back(input);
 
@@ -568,18 +584,35 @@ void ReadStimulus(vector <stimulus*> &stimuli, vector<BoolVar*>& Inputs, QString
             {
                 stimulus* stimuluss = new stimulus(); //declare a gate
                 stimuluss->time_stamp_ps=stoi(line); //gate component is inserted
+                if(stimuluss->time_stamp_ps <0)
+                {
+                  throw QMessageBox::critical(nullptr, "Error", "Negative Stimulus Time is Invalid");
+                }
                 getline(inputFile, line, ','); //read the next part of the line
                 line=fileOptimizer(line);
-                    //number of inputs is inserted
-                for(int i = 0; i < Inputs.size(); i++)
+                stimuluss->input = new BoolVar();
+                stimuluss->input->name = " ";
+                for(int i = 0; i < Inputs.size(); i++) //number of inputs is inserted
                 {
                     if(line == Inputs[i]->name)
                     {
                         stimuluss->input = Inputs[i];
                     }
                 }
+                if(stimuluss->input->name == " ")
+                {
+                    throw QMessageBox::critical(nullptr, "Error", "Unknown Input Detected in Stimuli File");
+                }
+                else if(stimuluss->input->input == false)
+                {
+                    throw QMessageBox::critical(nullptr, "Error", QString::fromStdString(stimuluss->input->name) + " is a Wire not an Input");
+                }
                 getline(inputFile,line,'\n');
                 stimuluss->new_value=stoi(line); //the functionality is inserted
+                if((stimuluss->new_value != 1) && (stimuluss->new_value != 0))
+                {
+                    throw QMessageBox::critical(nullptr, "Error", QString::fromStdString(to_string(stimuluss->time_stamp_ps)) + ", " + QString::fromStdString(stimuluss->input->name) + " has an Illegal Value which is:" + QString::fromStdString(to_string(stimuluss->new_value)));
+                }
                 if(stimuluss->time_stamp_ps == 0 && stimuluss->new_value == 0)
                 {
                     error = "Stimuli Removed: " + to_string(stimuluss->time_stamp_ps) + ", " + stimuluss->input->name + ", " + to_string(stimuluss->new_value) + " is Redundant";
@@ -869,7 +902,7 @@ void DrawTimeGraphs(vector<BoolVar>& SortedOutput, bool SequentialFlag, int inpu
         axisY->setRange(0, 1.5*float(SortedOutput.size()));
    }
 
-   axisY->setLabelsVisible(true);
+   axisY->setLabelsVisible(false);
    axisY->setLabelFormat("%.0f"); // Format for axis labels (optional)
    axisY->setTitleText("Output"); // Axis title
    axisY->setLabelsColor(Qt::white);
@@ -892,7 +925,7 @@ void DrawTimeGraphs(vector<BoolVar>& SortedOutput, bool SequentialFlag, int inpu
             lines.push_back(new QLineSeries());
             lines[i]->setPen(*Pen);
             lines[i]->setName(QString::fromStdString(SortedOutput[i].name));
-            lines[i]->setColor(QColor::fromRgb(rand()%256, rand()%256, rand()%256 ));
+            lines[i]->setColor(QColor::fromRgb(rand()%256, rand()%256, rand()%256));
             if(SequentialFlag)
             {
                 lines[i]->append(2*inputsize,static_cast<int>(SortedOutput[i].value)+2*(i+1));
@@ -944,19 +977,57 @@ void DrawTimeGraphs(vector<BoolVar>& SortedOutput, bool SequentialFlag, int inpu
 
 int main(int argc, char *argv[])
 {
-    QApplication a(argc, argv);
-    QMessageBox::information(nullptr, "Information", "Choose a .lib file");
-    QString filePath = QFileDialog::getOpenFileName(nullptr, "Select a File", "", "Lib Files (*.lib);;All Files (*)");
-    FileErrorHandling(filePath);
-    QMessageBox::information(nullptr, "Information", "Choose a .cir file");
-    QString filePath2 = QFileDialog::getOpenFileName(nullptr, "Select a File", "", "Circuit Files (*.cir);;All Files (*)");
-    FileErrorHandling(filePath2);
-    QMessageBox::information(nullptr, "Information", "Choose a .stim file");
-    QString filePath3= QFileDialog::getOpenFileName(nullptr, "Select a File", "", "Stim Files (*.stim);;All Files (*)");
-    FileErrorHandling(filePath3);
-    QMessageBox::information(nullptr, "Information", "Choose a .sim file");
-    QString filePath4= QFileDialog::getOpenFileName(nullptr, "Select a File", "", "Sim Files (*.sim);;All Files (*)");
-    FileErrorHandling(filePath4);
+
+   QApplication a(argc, argv);
+   QString filePath;
+   QString filePath2;
+   QString filePath3;
+   QString filePath4;
+
+
+   if(isatty(STDIN_FILENO))
+   {
+       QMessageBox::information(nullptr, "Information", "Running From Terminal");
+       QStringList arguments = a.arguments();
+       int i = 0;
+       for(const QString& arg : arguments)
+       {
+            if(i ==1)
+            {
+                filePath = arg;
+            }
+            else if(i ==2)
+            {
+               filePath2 = arg;
+            }
+            else if(i==3)
+            {
+               filePath3 = arg;
+            }
+            else if(i == 4)
+            {
+               filePath4 = arg;
+            }
+            i++;
+       }
+
+   }
+   else
+   {
+       QMessageBox::information(nullptr, "Information", "Choose a .lib file");
+       filePath = QFileDialog::getOpenFileName(nullptr, "Select a File", "", "Lib Files (*.lib);;All Files (*)");
+       FileErrorHandling(filePath);
+       QMessageBox::information(nullptr, "Information", "Choose a .cir file");
+       filePath2 = QFileDialog::getOpenFileName(nullptr, "Select a File", "", "Circuit Files (*.cir);;All Files (*)");
+       FileErrorHandling(filePath2);
+       QMessageBox::information(nullptr, "Information", "Choose a .stim file");
+       filePath3= QFileDialog::getOpenFileName(nullptr, "Select a File", "", "Stim Files (*.stim);;All Files (*)");
+       FileErrorHandling(filePath3);
+       QMessageBox::information(nullptr, "Information", "Choose a .sim file");
+       filePath4= QFileDialog::getOpenFileName(nullptr, "Select a File", "", "Sim Files (*.sim);;All Files (*)");
+       FileErrorHandling(filePath4);
+   }
+
     vector<LogicGates*> gates; //create instance of LogicGates
     vector<BoolVar*> inputs; //create instance of BoolVar
     vector<Components*> components; //create instance of Components
