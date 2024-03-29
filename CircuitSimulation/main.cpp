@@ -26,6 +26,7 @@ public:
     string name; //name of variable
     bool value; //value of variable
     int currtime = 0; //the time of each variable (needed in the simulation)
+    bool input = false;
 };
 
 class Components //class used to describe circuit components
@@ -101,6 +102,19 @@ void SortedStimuli(stimulus *value, vector<stimulus*>& SortedOutput) {
         }
     }
 }
+
+void Input_Not_Output(BoolVar* output)
+{
+    string error;
+    if(output->input)
+    {
+        error = output->name + " is an input and can't be a output";
+        throw QMessageBox::critical(nullptr, "Error", QString::fromStdString(error) );
+        exit(0);
+    }
+}
+
+
 
 int Maximum(int A, int B)
 {
@@ -283,6 +297,7 @@ void postfix_to_bool(Components* component, string postfix, int& time, bool firs
             holderstack.pop(); //pop it
             holderstack.push(character_to_operator(holder2, holder1, postfix[i], component)); //push in the stack the result of the operation of postfix[i] on holder1 and 2 and store it in component, making use of the character_to_operator function
             time = Maximum(holder1->currtime, holder2->currtime); //the time it takes is the max of both holder1 and holder2
+            holderstack.top()->currtime = time;
 
         }
         else if(postfix[i] == '~') //if the character is the negation operator
@@ -291,6 +306,7 @@ void postfix_to_bool(Components* component, string postfix, int& time, bool firs
             time = holder2->currtime;
             holderstack.pop(); //pop it
             holderstack.push(character_to_operator(holder2,holder2,postfix[i], component)); //push in the stack the result of the operation of postfix[i] on holder2 in component
+            holderstack.top()->currtime = time;
         }
     }
     oldvalue = component->output->value; //old value of component
@@ -421,6 +437,8 @@ void ReadCircuit(vector<LogicGates*>& gates ,vector<Components*>& components, ve
     ifstream inputFile(path.toStdString()); //reading the circuit file
     string line;
     bool found = false;
+    bool found2 = false;
+    string info;
 
     if (inputFile.is_open()) //if file opened
     {
@@ -432,6 +450,7 @@ void ReadCircuit(vector<LogicGates*>& gates ,vector<Components*>& components, ve
                 BoolVar* input = new BoolVar(); //create input instance
                 input->name = line; //add the name
                 input->value = false; //add the value
+                input->input = true;
                 inputs.push_back(input); //add to number of inputs vector
             }
 
@@ -457,21 +476,28 @@ void ReadCircuit(vector<LogicGates*>& gates ,vector<Components*>& components, ve
                     }
                     getline(inputFile, line, ','); //move to the next part
                     line = fileOptimizer(line);
+                    found2 = false;
                     for(int i = 0; i<inputs.size(); i++)
                     {
                         if(inputs[i]->name == line)
                         {
                             component->output = inputs[i];
+                            found2 = true;
+                            break;
                         }
-                        else
-                        {
-                            component->output = new BoolVar();
-                            component->output->name = line; //add the output names to component
-                            component->output->value = false;
-                        }
+                    }
+
+
+                    if(found2 == false)
+                    {
+                        component->output = new BoolVar();
+                        component->output->name = line; //add the output names to component
+                        component->output->value = false;
+                        inputs.push_back(component->output);
 
                     }
-                    inputs.push_back(component->output);
+                    Input_Not_Output(component->output);
+
                     for (int i = 0; i < component->gate.inputs; i++) //checking if inputs is repeated or no
                     {
                         if(i != component->gate.inputs - 1)
@@ -505,6 +531,8 @@ void ReadCircuit(vector<LogicGates*>& gates ,vector<Components*>& components, ve
                             input->name = line; //puts its name
                             input->value = false; //puts its value
                             component->inputs.push_back(input); //push back
+                            info = "Component Name: "+ component->component_name + ", " + "Input: " + input->name + ", is always set to 0" ;
+                            QMessageBox::information(nullptr, "Information", QString::fromStdString(info));
                             inputs.push_back(input);
 
                         }
@@ -597,6 +625,8 @@ void InputChecker(vector <stimulus*>& stimuli, vector <BoolVar*>& Inputs, int i,
     stimuli[i]->input->currtime = stimuli[i]->time_stamp_ps;
     SortedAddition(*stimuli[i]->input, SortedOutput);
 }
+
+
 
 bool HandleRedundantStim(vector <stimulus*>& stimuli,int x)
 {
@@ -825,7 +855,7 @@ void DrawTimeGraphs(vector<BoolVar>& SortedOutput, bool SequentialFlag, int inpu
    axisX->setRange(0, max);
    axisX->setLabelFormat("%.0f"); // Format for axis labels (optional)
    axisX->setTitleText("Time/ps"); // Axis title
-   axisX->applyNiceNumbers();
+   //axisX->applyNiceNumbers();
    axisX->setLabelsColor(Qt::white);
    axisX->setTitleBrush(Qt::white);
 
@@ -863,9 +893,19 @@ void DrawTimeGraphs(vector<BoolVar>& SortedOutput, bool SequentialFlag, int inpu
             lines[i]->setPen(*Pen);
             lines[i]->setName(QString::fromStdString(SortedOutput[i].name));
             lines[i]->setColor(QColor::fromRgb(rand()%256, rand()%256, rand()%256 ));
-            lines[i]->append(2*SortedOutput.size(),static_cast<int>(SortedOutput[i].value)+2*(i+1));
-            lines[i]->append(SortedOutput[i].currtime,static_cast<int>(SortedOutput[i].value)+2*(i+1));
-            lines[i]->append(max, static_cast<int>(SortedOutput[i].value)+2*(i+1));
+            if(SequentialFlag)
+            {
+                lines[i]->append(2*inputsize,static_cast<int>(SortedOutput[i].value)+2*(i+1));
+                lines[i]->append(SortedOutput[i].currtime,static_cast<int>(SortedOutput[i].value)+2*(i+1));
+                lines[i]->append(max, static_cast<int>(SortedOutput[i].value)+2*(i+1));
+            }
+
+            else
+            {
+                lines[i]->append(2*SortedOutput.size(),static_cast<int>(SortedOutput[i].value)+2*(i+1));
+                lines[i]->append(SortedOutput[i].currtime,static_cast<int>(SortedOutput[i].value)+2*(i+1));
+                lines[i]->append(max, static_cast<int>(SortedOutput[i].value)+2*(i+1));
+            }
 
        }
        else
@@ -882,7 +922,7 @@ void DrawTimeGraphs(vector<BoolVar>& SortedOutput, bool SequentialFlag, int inpu
                 }
 
             }
-      }
+       }
 
    }
 
@@ -894,7 +934,6 @@ void DrawTimeGraphs(vector<BoolVar>& SortedOutput, bool SequentialFlag, int inpu
    }
 
    chart->setBackgroundBrush(Qt::black);
-   chart->zoom(1000000);
    chartView->setChart(chart);
    chartView->setRubberBand(QChartView::HorizontalRubberBand);
    chartView->show();
