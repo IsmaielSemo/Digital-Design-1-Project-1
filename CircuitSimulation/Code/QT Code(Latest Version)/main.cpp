@@ -340,6 +340,7 @@ void postfix_to_bool_Sequential(Components* component, string postfix, int& time
     char NextChar;
     int index;
     bool oldvalue;
+    oldvalue = component->output->value;
 
     for(int i = 0; i<postfix.size(); i++) //while we are still in the postfix expression
     {
@@ -366,6 +367,7 @@ void postfix_to_bool_Sequential(Components* component, string postfix, int& time
             if((time == holder1->currtime) || (time == holder2->currtime))
             {
                 holderstack.push(character_to_operator(holder2, holder1, postfix[i], component));
+                holderstack.top()->currtime = time;
             }
             else
             {
@@ -383,6 +385,7 @@ void postfix_to_bool_Sequential(Components* component, string postfix, int& time
             if(time == holder2->currtime)
             {
                 holderstack.push(character_to_operator(holder2,holder2,postfix[i], component));
+                holderstack.top()->currtime = time;
             }
             else
             {
@@ -391,7 +394,7 @@ void postfix_to_bool_Sequential(Components* component, string postfix, int& time
 
         }
     }
-    oldvalue = component->output->value; //old value of component
+     //old value of component
     component->output ->value = holderstack.top()->value; //the new value of component (as reached above)
     if(firstsim)
     {
@@ -693,7 +696,7 @@ void Simulation(vector <stimulus*>& stimuli, vector <Components*>& Components, v
 
     for (int i = 0; i <Inputs.size(); i++)
     {
-        if(Inputs[i]->value == 0)
+        if((Inputs[i]->value == 0) || (Inputs[i]->input== true && Inputs[i]->currtime == 0 && Inputs[i]->value == 1))
         {
             SortedAddition(*Inputs[i], SortedOutput);
         }
@@ -775,13 +778,13 @@ void SequentialSimulator(vector <stimulus*>& stimuli, vector <Components*>& Comp
 
    for (int i = 0; i <Inputs.size(); i++)
    {
-       if(Inputs[i]->value == 0)
+       if(Inputs[i]->value == 0 || (Inputs[i]->input== true && Inputs[i]->currtime == 0 && Inputs[i]->value == 1))
        {
             SortedAddition(*Inputs[i], SortedOutput);
        }
    }
 
-   for(int i=1; i <1000000; i++)
+   for(int i=0; i <1000000; i++)
    {
        if(stimcount != stimuli.size())
        {
@@ -985,7 +988,7 @@ int main(int argc, char *argv[])
    QString filePath4;
 
 
-   if(isatty(STDIN_FILENO))
+   if(!isatty(STDIN_FILENO))
    {
        QMessageBox::information(nullptr, "Information", "Running From Terminal");
        QStringList arguments = a.arguments();
